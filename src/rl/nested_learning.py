@@ -36,6 +36,10 @@ TERM_LIMITS = {'2024.1': (None, '2025-01-01T00:00:00+07:00'),
                '2025.2': ('2026-01-01T00:00:00+07:00', '2026-07-01T00:00:00+07:00')}
 REPRESENTATION_KEYS = ('state_contract', 'feature_contract_sha256', 'taxonomy_feature_order_sha256')
 SIGNAL_TYPES = {'initial_source', 'student_preference', 'advisor_feedback', 'coordinator_correction', 'verified_outcome'}
+POOL_TERM_ORDER = ('2024', '2025.1', '2025.2')
+POOL_TERM_LIMITS = {'2024': (None, '2025-09-01T00:00:00+07:00'),
+                    '2025.1': ('2025-09-01T00:00:00+07:00', '2026-01-01T00:00:00+07:00'),
+                    '2025.2': ('2026-01-01T00:00:00+07:00', '2026-06-01T00:00:00+07:00')}
 
 
 def _read(path):
@@ -183,6 +187,7 @@ def _validate_applied_feedback(previous, train, contract, spec, snapshot):
     actual = {key: (before[key], after[key]) for key in before if before[key] != after[key]}
     declared = {}
     allowed = {'student_preference': {'preferences', 'preference_known'},
+               'verified_outcome': {'preferences', 'preference_known'},
                'advisor_feedback': {'eligible', 'present', 'capacities'},
                'coordinator_correction': {'eligible', 'present', 'capacities', 'scores', 'available'}}
     expected_sources = {s['signal_id']: s['source_sha256'] for s in human}
@@ -193,6 +198,9 @@ def _validate_applied_feedback(previous, train, contract, spec, snapshot):
         if signal['type'] not in allowed:
             raise ValueError('unsupported_feedback_signal_type')
         source = _read(signal['source_path'])
+        if (signal['type'] == 'verified_outcome'
+                and source.get('provenance') != 'historical_thesis_supervision_outcome_proxy_not_independent_advisor_acceptance'):
+            raise ValueError('unsupported_feedback_signal_type')
         if source.get('signal_id') != signal['signal_id'] or not isinstance(source.get('changes'), list) or not source['changes']:
             raise ValueError('typed_signal_changes_required')
         for row in source['changes']:
@@ -241,10 +249,14 @@ def validate_round(train_problems, validation_problem, contract, round_spec, *, 
         raise ValueError('algorithm_and_nonnegative_seed_required')
     if type(index) is not int or index < 1 or not isinstance(round_spec.get('round_id'), str) or not round_spec['round_id'].strip():
         raise ValueError('positive_round_index_and_id_required')
-    if term not in TERM_ORDER:
+    calendar = round_spec.get('calendar_protocol', 'legacy/1')
+    if calendar not in ('legacy/1', 'semester-pool/1'):
+        raise ValueError('known_calendar_protocol_required')
+    term_order, term_limits = (POOL_TERM_ORDER, POOL_TERM_LIMITS) if calendar == 'semester-pool/1' else (TERM_ORDER, TERM_LIMITS)
+    if term not in term_order:
         raise ValueError('known_semester_id_required')
     cutoff = _time(round_spec.get('cutoff_timestamp'))
-    lower, upper = TERM_LIMITS[term]
+    lower, upper = term_limits[term]
     if cutoff >= _time(upper) or (lower and cutoff < _time(lower)):
         raise ValueError('round_cutoff_outside_semester_window')
     for name in ('reward_version', 'constraint_version'):
@@ -255,7 +267,7 @@ def validate_round(train_problems, validation_problem, contract, round_spec, *, 
     previous = _parent(parent)
     if previous is None and index != 1:
         raise ValueError('parent_required_for_later_round')
-    if previous is None and term != TERM_ORDER[0] and round_spec.get('control') != 'from_scratch':
+    if previous is None and term != term_order[0] and round_spec.get('control') != 'from_scratch':
         raise ValueError('parent_required_after_bootstrap_semester')
     proxy = (contract.get('scope') == 'retrospective_document_proxy'
              and round_spec.get('availability_assumption') == 'retrospective_event_time_proxy')
@@ -308,6 +320,8 @@ def validate_round(train_problems, validation_problem, contract, round_spec, *, 
     if previous:
         old = previous['input']
         old_spec = old['round']
+        if old_spec.get('calendar_protocol', 'legacy/1') != calendar:
+            raise ValueError('parent_calendar_protocol_mismatch')
         if old_spec['algorithm'] != algorithm or old_spec['seed'] != seed:
             raise ValueError('parent_algorithm_seed_mismatch')
         if any(old['contract'].get(key) != contract.get(key) for key in REPRESENTATION_KEYS):
@@ -316,7 +330,7 @@ def validate_round(train_problems, validation_problem, contract, round_spec, *, 
             raise ValueError('nonchronological_round_cutoff')
         cross_semester = term != old_spec['semester_id']
         if cross_semester:
-            if TERM_ORDER.index(term) != TERM_ORDER.index(old_spec['semester_id']) + 1 or index != 1:
+            if term_order.index(term) != term_order.index(old_spec['semester_id']) + 1 or index != 1:
                 raise ValueError('adjacent_semester_and_first_round_required')
         elif index != old_spec['round_index'] + 1 or old['memberships'] != memberships:
             raise ValueError('same_semester_cohort_and_consecutive_round_required')

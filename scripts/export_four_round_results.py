@@ -25,6 +25,8 @@ def export(root, output):
                 or data['protocol'].get('timesteps_per_fit') != 32768
                 or data['protocol'].get('seed') != 42):
             raise ValueError('this_mock_publication_requires_simulated_seed42_32768_step_protocol')
+        if data['protocol'].get('feedback_recipe', 'top_similarity_preference_0.8_and_one_extra_advisor_seat') != 'top_similarity_preference_0.8_and_one_extra_advisor_seat':
+            raise ValueError('new_feedback_recipe_requires_updated_publication_labels')
         completed &= data['status'] == 'completed'
         for row in data['results']:
             report = verify_round(root / algorithm / row['artifact'])

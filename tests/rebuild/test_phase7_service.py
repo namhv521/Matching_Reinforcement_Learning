@@ -58,6 +58,26 @@ def test_minimal_csv_observed_provenance_pending_and_no_refit(service):
     assert len(service.template('students').decode('utf-8-sig').splitlines()) == 1
 
 
+def test_quota_policy_comes_from_the_loaded_model_versions(service):
+    service.versions['quota_policy_version'] = 'user-authorized-equal-quota/1'
+    assert service.quotas(2, ['a', 'b'])['policy_version'] == 'user-authorized-equal-quota/1'
+
+
+def test_document_proxy_upload_keeps_confidence_unknown_but_requires_evidence(service):
+    row = {'student_id': 's', 'thesis_title': 'Technical thesis', 'topic_tags': 'nlp',
+           'skill_evidence_type': 'inferred_from_thesis', 'skill_evidence_refs': 'page 3'}
+    assert not service.validate_students(csv_text([row]))['valid']
+    service.versions['allow_unknown_document_confidence'] = True
+    result = service.validate_students(csv_text([row]))
+    assert result['valid']
+    assert service.get_students(result['cohort_id'])[0]['skill_confidence'] == ''
+    row['skill_evidence_refs'] = ''
+    assert not service.validate_students(csv_text([row]))['valid']
+    row['skill_evidence_refs'] = 'page 3'
+    row['skill_confidence'] = 'invalid'
+    assert not service.validate_students(csv_text([row]))['valid']
+
+
 def test_recommendations_separate_from_quota_and_compare_has_truthful_unavailable_models(service):
     report = upload(service)
     recommendations = service.recommend(report['cohort_id'], ['a', 'b'], top_k=1, scope='owner-a')

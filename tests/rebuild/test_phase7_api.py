@@ -27,6 +27,16 @@ def test_auth_fail_closed_and_bootstrap_template_header_only(service):
     assert TestClient(create_app(service=service, token='')).get('/api/rebuild/bootstrap', headers=headers).status_code == 503
 
 
+def test_explicit_semester_run_uses_new_loader_and_keeps_auth(service, monkeypatch, tmp_path):
+    from src.serving import semester_service
+    monkeypatch.setenv('UNIMATCH_SEMESTER_RUN',str(tmp_path))
+    monkeypatch.setattr(semester_service,'load_semester_service',lambda root,inputs=None:service)
+    client=TestClient(create_app(token=TOKEN))
+    assert client.get('/api/rebuild/bootstrap').status_code==401
+    response=client.get('/api/rebuild/bootstrap',headers={'Authorization':'Bearer '+TOKEN})
+    assert response.status_code==200 and len(response.json()['advisors'])==2
+
+
 def test_csv_import_quota_compare_export_and_untrusted_origin(service):
     client = TestClient(create_app(service=service, token=TOKEN))
     headers = {'Authorization': 'Bearer '+TOKEN}

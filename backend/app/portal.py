@@ -219,6 +219,10 @@ def install_portal(app):
             app.state.rebuild_authorize(request)
         else:
             authenticated(request)
+        if getattr(app.state,'semester_run',None) is not None:
+            from src.serving.semester_service import semester_telemetry
+            active=app.state.rebuild_get_service()
+            return semester_telemetry(app.state.semester_run,active.versions)
         path = getattr(app.state, 'training_report', ROOT / 'docs/validation/github_retraining_numeric_20261023.json')
         if not path.is_file():
             raise HTTPException(503, 'training_report_unavailable')

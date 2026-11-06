@@ -197,6 +197,9 @@ class CSVRecord(BaseModel):
         if tags or proficiency:
             for suffix in ('evidence_type', 'evidence_refs', 'confidence'):
                 field = f'{prefix}_{suffix}'
+                if (suffix == 'confidence' and context.get('allow_unknown_document_confidence')
+                        and getattr(self, f'{prefix}_evidence_type') == 'inferred_from_thesis'):
+                    continue
                 if getattr(self, field) is None or (suffix == 'evidence_type' and getattr(self, field) == 'missing'):
                     error(field, 'tag_evidence_required')
         if proficiency:
@@ -270,10 +273,11 @@ def _check_options(entity, mode):
         raise ValueError('mode must be staging, gold or allocation')
 
 
-def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None):
+def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None, allow_unknown_document_confidence=False):
     try:
         model = MODELS[entity].model_validate(row, context={
-            'mode': mode, 'taxonomy_ids': taxonomy_ids, 'taxonomy_groups': taxonomy_groups})
+            'mode': mode, 'taxonomy_ids': taxonomy_ids, 'taxonomy_groups': taxonomy_groups,
+            'allow_unknown_document_confidence': allow_unknown_document_confidence})
         return model, []
     except ValidationError as exc:
         errors = []
@@ -286,10 +290,11 @@ def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None):
 
 
 def validate_row(row: dict, entity: str, *, mode='staging', taxonomy_ids: set[str] | None = None,
-                 taxonomy_groups: dict[str, set[str]] | None = None) -> list[dict]:
+                 taxonomy_groups: dict[str, set[str]] | None = None,
+                 allow_unknown_document_confidence=False) -> list[dict]:
     """Validate one candidate; no mutation, missing-to-zero fill, or approval."""
     _check_options(entity, mode)
-    return _validate(row, entity, mode, taxonomy_ids, taxonomy_groups)[1]
+    return _validate(row, entity, mode, taxonomy_ids, taxonomy_groups, allow_unknown_document_confidence)[1]
 
 
 def export_json_schema(entity: str) -> dict:

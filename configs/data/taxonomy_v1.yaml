@@ -23,6 +23,16 @@ groups:
       aliases: [computer networks, mạng máy tính, internet of things, internet vạn vật, IoT]
     business_analytics:
       aliases: [business analytics, phân tích kinh doanh]
+    web_development:
+      aliases: [web development, web engineering, phát triển web, lập trình web, ứng dụng web]
+    mobile_development:
+      aliases: [mobile development, mobile application development, phát triển ứng dụng di động, lập trình di động]
+    game_development:
+      aliases: [game development, game design, phát triển game, phát triển trò chơi, thiết kế trò chơi]
+    human_computer_interaction:
+      aliases: [human computer interaction, interaction design, tương tác người máy, tương tác người dùng]
+    blockchain:
+      aliases: [blockchain, chuỗi khối]
   topic_tags:
     machine_learning:
       aliases: [machine learning, học máy]
@@ -41,6 +51,31 @@ groups:
       aliases: [recommendation system, recommendation systems, recommender system, hệ gợi ý, hệ thống gợi ý, hệ khuyến nghị]
     optimization:
       aliases: [optimization, optimisation, tối ưu hóa, tối ưu hoá]
+    frontend_development:
+      aliases: [frontend development, front-end development, front end development, phát triển frontend, phát triển giao diện]
+    backend_development:
+      aliases: [backend development, back-end development, back end development, phát triển backend, phát triển máy chủ]
+    full_stack_development:
+      aliases: [full stack, full-stack, fullstack, full stack development, full-stack development, fullstack development, phát triển full stack]
+    mobile_app_development:
+      aliases: [mobile app, mobile application, ứng dụng di động, ứng dụng mobile, app di động]
+    game_programming:
+      aliases: [game programming, game engine, lập trình game, lập trình trò chơi, công cụ game]
+    ui_ux_design:
+      aliases: [ui ux design, ui/ux design, user interface design, user experience design, thiết kế giao diện người dùng, thiết kế trải nghiệm người dùng]
+      case_sensitive_aliases: [UI/UX]
+    distributed_systems:
+      aliases: [distributed systems, distributed system, hệ thống phân tán]
+    microservices:
+      aliases: [microservices, microservice, kiến trúc vi dịch vụ]
+    embedded_systems:
+      aliases: [embedded systems, embedded system, hệ thống nhúng]
+    internet_of_things:
+      aliases: [internet of things, internet vạn vật]
+      case_sensitive_aliases: [IoT]
+    virtual_augmented_reality:
+      aliases: [virtual reality, augmented reality, mixed reality, thực tế ảo, thực tế tăng cường]
+      case_sensitive_aliases: [VR, AR, MR]
   programming_languages:
     python:
       aliases: [Python]
@@ -58,6 +93,21 @@ groups:
       aliases: [R programming, ngôn ngữ R, lập trình R]
     sql:
       aliases: [SQL, structured query language, ngôn ngữ truy vấn có cấu trúc]
+    php:
+      aliases: [PHP]
+    kotlin:
+      aliases: [Kotlin]
+    swift:
+      aliases: [Swift]
+    dart:
+      aliases: [Dart]
+    go:
+      aliases: [Golang, Go programming, ngôn ngữ Go]
+      case_sensitive_aliases: [Go]
+    ruby:
+      aliases: [Ruby]
+    rust:
+      aliases: [Rust]
   frameworks_libraries:
     pytorch:
       aliases: [PyTorch, Py Torch]
@@ -70,10 +120,38 @@ groups:
     django:
       aliases: [Django]
     react:
-      aliases: [ReactJS, React.js, React framework, React Native]
+      aliases: [ReactJS, React.js, React framework]
       case_sensitive_aliases: [React]
     spring:
       aliases: [Spring Framework, Spring Boot, Spring MVC]
+    nodejs:
+      aliases: [Node.js, NodeJS, Node JS]
+    expressjs:
+      aliases: [Express.js, ExpressJS, Express JS]
+    nextjs:
+      aliases: [Next.js, NextJS, Next JS]
+    vuejs:
+      aliases: [Vue.js, VueJS, Vue JS]
+    angular:
+      aliases: [Angular, AngularJS]
+    laravel:
+      aliases: [Laravel]
+    flask:
+      aliases: [Flask]
+    dotnet:
+      aliases: [.NET, dotnet, ASP.NET]
+    flutter:
+      aliases: [Flutter]
+    react_native:
+      aliases: [React Native]
+    android_sdk:
+      aliases: [Android SDK, Android development]
+    unity:
+      aliases: [Unity, Unity3D]
+    unreal_engine:
+      aliases: [Unreal Engine]
+    godot:
+      aliases: [Godot]
   databases:
     postgresql:
       aliases: [PostgreSQL, Postgres]
@@ -87,6 +165,14 @@ groups:
       aliases: [Neo4j]
     sqlite:
       aliases: [SQLite]
+    mariadb:
+      aliases: [MariaDB]
+    oracle_database:
+      aliases: [Oracle Database, Oracle DB]
+    firebase:
+      aliases: [Firebase, Cloud Firestore]
+    elasticsearch:
+      aliases: [Elasticsearch, Elastic Search]
   ml_ai_methods:
     classification:
       aliases: [classification, phân loại, phân lớp]
@@ -137,6 +223,14 @@ groups:
       aliases: [CI/CD, CI CD, continuous integration continuous delivery]
     linux:
       aliases: [Linux]
+    nginx:
+      aliases: [Nginx]
+    terraform:
+      aliases: [Terraform]
+    ansible:
+      aliases: [Ansible]
+    github_actions:
+      aliases: [GitHub Actions]
   security_network_tools:
     network_security:
       aliases: [network security, bảo mật mạng]
@@ -148,6 +242,12 @@ groups:
       aliases: [computer networking, mạng máy tính]
     iot_security:
       aliases: [IoT security, bảo mật IoT, bảo mật internet vạn vật]
+    application_security:
+      aliases: [application security, app security, bảo mật ứng dụng]
+    penetration_testing:
+      aliases: [penetration testing, pen testing, kiểm thử xâm nhập]
+    digital_forensics:
+      aliases: [digital forensics, computer forensics, pháp chứng số]
   software_engineering_methods:
     testing:
       aliases: [software testing, kiểm thử phần mềm]
@@ -159,6 +259,20 @@ groups:
       aliases: [Agile]
     uml:
       aliases: [UML, unified modeling language, ngôn ngữ mô hình hóa thống nhất]
+    frontend_engineering:
+      aliases: [frontend engineering, front-end engineering, kỹ thuật frontend]
+    backend_engineering:
+      aliases: [backend engineering, back-end engineering, kỹ thuật backend]
+    responsive_design:
+      aliases: [responsive design, responsive web design, thiết kế đáp ứng]
+    accessibility:
+      aliases: [web accessibility, accessibility testing, khả năng tiếp cận web]
+    devops:
+      aliases: [DevOps]
+    version_control:
+      aliases: [version control, source control, quản lý phiên bản]
+    design_patterns:
+      aliases: [design patterns, software design patterns, mẫu thiết kế phần mềm]
   research_methods:
     literature_review:
       aliases: [literature review, tổng quan tài liệu, tổng quan nghiên cứu]

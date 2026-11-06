@@ -227,7 +227,8 @@ class RebuildService:
                         if not row[field].strip():
                             row[field] = value
                     for item in validate_row(row, 'students', mode='staging', taxonomy_ids=self.taxonomy_ids,
-                                             taxonomy_groups=self.taxonomy_groups):
+                                             taxonomy_groups=self.taxonomy_groups,
+                                             allow_unknown_document_confidence=self.versions.get('allow_unknown_document_confidence', False)):
                         error(reader.line_num, item['field'], item['code'])
                     key = row['student_id'].strip()
                     if key in seen:
@@ -351,7 +352,7 @@ class RebuildService:
         if not isinstance(advisor_ids, list):
             raise ValueError('advisor_ids_list_required')
         capacities = equal_quotas(student_count, self.advisor_ids, advisor_ids)
-        return {'student_count': student_count, 'policy_version': POLICY_VERSION,
+        return {'student_count': student_count, 'policy_version': self.versions.get('quota_policy_version', POLICY_VERSION),
                 'quotas': [{'advisor_id': a['advisor_id'], 'advisor_name': a['advisor_name'],
                             'capacity': int(capacities[j]), 'selected': a['advisor_id'] in advisor_ids,
                             'scorable': bool(self.scorable[j])} for j, a in enumerate(self.advisors)],
@@ -400,6 +401,7 @@ class RebuildService:
         from src.evaluation.rebuild_benchmark import evaluate_problem
         if coordinator_confirmed is not True:
             raise ValueError('coordinator_confirmation_required')
+        policy_version = self.versions.get('quota_policy_version', POLICY_VERSION)
         with self._lock:
             students, problem = self._problem(cohort_id, advisor_ids, scope)
             results = {}
@@ -414,7 +416,7 @@ class RebuildService:
                 if model is not None and self.model_contracts.get(algorithm, {}).get('state_contract') != env_contract:
                     raise ValueError('inference_state_contract_mismatch')
                 if model is not None and (self.model_contracts[algorithm].get('reward_weights') != inference_env.reward_weights
-                                         or self.model_contracts[algorithm].get('quota_policy_version') != POLICY_VERSION):
+                                         or self.model_contracts[algorithm].get('quota_policy_version') != policy_version):
                     raise ValueError('inference_policy_contract_mismatch')
                 results[algorithm] = evaluate_problem(problem, algorithm, model=model, seed=42)
                 for assignment in results[algorithm]['assignments']:
@@ -422,7 +424,7 @@ class RebuildService:
                     assignment.update(student_name=students[i].get('student_name', ''), advisor_name=self.advisors[j]['advisor_name'],
                                       score=float(problem.scores[i, j]), preference=None, preference_known=False)
             payload = {'cohort_id': cohort_id, 'versions': self.versions, 'results': results,
-                       'policy': {'version': POLICY_VERSION, 'scope': 'coordinator_confirmed_local_proposal',
+                       'policy': {'version': policy_version, 'scope': 'coordinator_confirmed_local_proposal',
                                   'advisor_ids': list(advisor_ids), 'capacities': problem.capacities.tolist(),
                                   'academic_approval': False},
                        'inference_contract_sha256': record_hash({'input': problem.metadata, 'state': env_contract, 'versions': self.versions}),

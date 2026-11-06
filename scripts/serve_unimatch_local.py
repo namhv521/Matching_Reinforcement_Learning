@@ -52,11 +52,24 @@ def local_app_entrypoint(output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',type=int,default=8767)
-    parser.add_argument('--token-file',type=Path,default=ROOT/'data_rebuild/runtime/access.token')
+    parser.add_argument('--token-file',type=Path)
+    parser.add_argument('--semester-run',type=Path,help='Completed semester run containing suites/ and training/.')
+    parser.add_argument('--semester-inputs',type=Path,default=ROOT/'data/training_prepared_20261101')
+    parser.add_argument('--env-file',type=Path,default=ROOT/'.env',help='Local OAuth/settings file; existing process variables take precedence.')
     parser.add_argument('--selection',type=Path,help='Explicit verified model-selection manifest')
     args=parser.parse_args()
+    current_semester_run=ROOT/'outputs/semester_rl_20261101'
+    if not args.semester_run and not args.selection and (current_semester_run/'training/selection.json').is_file():
+        args.semester_run=current_semester_run
+    if args.semester_run:
+        os.environ['UNIMATCH_SEMESTER_RUN']=str(args.semester_run.resolve())
+        os.environ['UNIMATCH_SEMESTER_INPUTS']=str(args.semester_inputs.resolve())
+        local_database=str(args.semester_run.resolve()/'runtime/portal.sqlite3')
+        os.environ['UNIMATCH_AUTH_DB']=local_database
+        os.environ['UNIMATCH_DATABASE_URL']=local_database
+    args.token_file=args.token_file or (args.semester_run/'runtime/access.token' if args.semester_run else ROOT/'data_rebuild/runtime/access.token')
     os.environ['UNIMATCH_REBUILD_TOKEN']=load_local_token(args.token_file)
-    selection=args.selection or local_selection_path(ROOT/'data_rebuild/v1')
+    selection=args.selection or (None if args.semester_run else local_selection_path(ROOT/'data_rebuild/v1'))
     if selection is not None:
         os.environ['UNIMATCH_REBUILD_SELECTION']=str(selection.resolve())
     os.environ.setdefault('OMP_NUM_THREADS','1')
@@ -65,4 +78,6 @@ if __name__=='__main__':
     print(f'Local workspace: http://127.0.0.1:{args.port}/login.html',flush=True)
     print(f'Access token file: {args.token_file.resolve()} (private; value not logged)',flush=True)
     import uvicorn
-    uvicorn.run(local_app_entrypoint(ROOT/'data_rebuild/v1'),host='127.0.0.1',port=args.port,access_log=False)
+    entrypoint='backend.app.rebuild_api:app' if args.semester_run else local_app_entrypoint(ROOT/'data_rebuild/v1')
+    uvicorn.run(entrypoint,host='127.0.0.1',port=args.port,access_log=False,
+                env_file=str(args.env_file.resolve()) if args.env_file.is_file() else None)
