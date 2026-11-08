@@ -75,11 +75,16 @@ def run(suites, feedback, output, *, timesteps=131072, eval_interval=8192, seed=
     inputs = {v: {1: read(Path(suites) / v / 'suite.json'),
                   2: read(Path(feedback) / v / 'R2.json'),
                   3: read(Path(feedback) / v / 'R3.json')} for v in VERSIONS}
+    recipes = {inputs[v][i].get('mock_recipe', 'top_similarity_preference_0.8_and_one_extra_advisor_seat')
+               for v in VERSIONS for i in (2, 3)}
+    if len(recipes) != 1:
+        raise ValueError('one_consistent_feedback_recipe_required')
     for version in VERSIONS:
         for index in (1, 2, 3):
             prepare(inputs[version][index], version, index, algorithms[0], seed)
     output.mkdir(parents=True)
     protocol = {'timesteps_per_fit': timesteps, 'eval_interval': eval_interval, 'seed': seed,
+                'feedback_recipe': next(iter(recipes)),
                 'feedback_scope': ('simulated_feedback_not_human' if any(
                     inputs[v][i].get('experiment_scope') == 'simulated_feedback_not_human'
                     for v in VERSIONS for i in (2, 3)) else 'source_bound_feedback'),

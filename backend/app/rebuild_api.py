@@ -40,6 +40,8 @@ def create_app(*, service=None, token=None, output=None, selection_manifest=None
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['GET', 'POST'],
                            allow_headers=['Authorization', 'Content-Type'], allow_credentials=False)
     app.state.rebuild_service = service
+    semester_run=os.environ.get('UNIMATCH_SEMESTER_RUN')
+    app.state.semester_run=Path(semester_run).resolve() if semester_run else None
     app.state.rebuild_initialization_lock = threading.Lock()
 
     def authorize(request: Request):
@@ -71,7 +73,11 @@ def create_app(*, service=None, token=None, output=None, selection_manifest=None
             with app.state.rebuild_initialization_lock:
                 if app.state.rebuild_service is None:
                     try:
-                        app.state.rebuild_service = RebuildService.from_artifacts(output, selection_manifest=selection)
+                        if app.state.semester_run is not None:
+                            from src.serving.semester_service import load_semester_service
+                            app.state.rebuild_service=load_semester_service(app.state.semester_run,inputs=os.environ.get('UNIMATCH_SEMESTER_INPUTS'))
+                        else:
+                            app.state.rebuild_service = RebuildService.from_artifacts(output, selection_manifest=selection)
                     except Exception:
                         # Source/checkpoint paths, names, tokens and tracebacks never enter HTTP errors.
                         raise HTTPException(503, detail='verified_artifacts_not_ready') from None

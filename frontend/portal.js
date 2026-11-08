@@ -57,6 +57,10 @@ async function training() {
   try {
     const response = await fetch('/api/rebuild/training', {cache:'no-store'});
     const data = await response.json(); if (!response.ok) throw new Error(response.status === 409 ? 'Báo cáo chưa khớp mô hình đang phục vụ.' : 'Chưa tải được báo cáo. Hãy thử lại.');
+    if (data.mode === 'semester_nested') {
+      const { renderSemesterTraining } = await import('./nested-research.js');
+      renderSemesterTraining(data); return;
+    }
     $('training-status').textContent = `Báo cáo lần chạy đã lưu · cập nhật ${new Date(data.updated_at*1000).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}. Không phải tiến trình train trực tiếp.`;
     $('training-summary').innerHTML = Object.entries(data.models).map(([key,model]) => `<article class="training-model" data-model="${key}"><h2>${key.toUpperCase()}</h2><strong>${number(model.trained_steps)}</strong> bước / seed<progress value="${model.trained_steps}" max="${model.target_steps}" aria-label="Tiến độ ${key.toUpperCase()}"></progress><dl><dt>Ngân sách</dt><dd>${number(model.target_steps)} bước</dd><dt>Số seed</dt><dd>${model.seeds}</dd><dt>Mô hình được chọn tại</dt><dd>${number(model.selected_steps)} bước</dd><dt>Ổn định trong cửa sổ đo</dt><dd>${model.plateau ? 'Đạt tiêu chí' : 'Chưa đạt'}</dd></dl><p>Độ dao động ${number(model.observed_range)}; ngưỡng ${number(model.criterion.max_mean_compatibility_range)} trong ${model.criterion.evaluations} lần đánh giá cuối.</p></article>`).join('');
     const width = 1000, height = 410, left = 62, right = 24, top = 25, bottom = 65;

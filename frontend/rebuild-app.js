@@ -71,8 +71,10 @@ async function connect() {
   try {
     state.base = "";
     state.bootstrap = await api("/bootstrap");
-    $("model-source").textContent = state.bootstrap.versions?.github_bundle_run_id ? "Nguồn: hồ sơ FIT NEU và GitHub đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota." : "Nguồn: hồ sơ FIT NEU đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota.";
-    $("model-status").innerHTML = (state.bootstrap.algorithms || []).toSorted((a,b)=>["ppo","dqn","hungarian"].indexOf(a.id)-["ppo","dqn","hungarian"].indexOf(b.id)).map(a => `<div class="model-row"><b>${escape(labels[a.id] || a.id)}</b><small>${a.id === 'hungarian' ? 'Thuật toán tối ưu có quota · baseline' : 'Học tăng cường · dữ liệu nguồn đã duyệt'}</small><span class="${a.ready ? 'status-good' : 'status-warn'}">${a.ready ? 'Sẵn sàng' : 'Chưa khả dụng'}</span></div>`).join('');
+    const retrospective = state.bootstrap.versions?.scope === 'retrospective_document_proxy';
+    if (retrospective) $("model-summary").textContent = "PPO dùng checkpoint được giữ sau validation. Lượt này chưa train DQN; Hungarian là phương pháp đối chiếu.";
+    $("model-source").textContent = retrospective ? "Nguồn: khóa luận và corpus giảng viên hồi cứu. PPO dùng encoder cố định và chia đều chỉ tiêu theo danh sách đã chọn; chưa xác nhận chất lượng hướng dẫn thực tế." : state.bootstrap.versions?.github_bundle_run_id ? "Nguồn: hồ sơ FIT NEU và GitHub đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota." : "Nguồn: hồ sơ FIT NEU đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota.";
+    $("model-status").innerHTML = (state.bootstrap.algorithms || []).toSorted((a,b)=>["ppo","dqn","hungarian"].indexOf(a.id)-["ppo","dqn","hungarian"].indexOf(b.id)).map(a => `<div class="model-row"><b>${escape(labels[a.id] || a.id)}</b><small>${a.id === 'hungarian' ? 'Thuật toán tối ưu có quota · baseline' : retrospective ? 'Model nghiên cứu · tài liệu hồi cứu' : 'Học tăng cường · dữ liệu nguồn đã duyệt'}</small><span class="${a.ready ? 'status-good' : 'status-warn'}">${a.ready ? 'Sẵn sàng' : 'Chưa khả dụng'}</span></div>`).join('');
     renderAdvisors(); renderQuota(); message("");
   } catch(error) { message(errorMessage(error), "error"); }
   finally { busy(false); }

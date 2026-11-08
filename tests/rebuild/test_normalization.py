@@ -34,6 +34,18 @@ def test_aliases_preserve_original_offsets_and_do_not_assign_proficiency():
     assert all(set(m) == {'tag', 'group', 'matched_text', 'start', 'end', 'evidence_type'} for m in found)
 
 
+def test_web_mobile_game_and_product_development_terms_are_taxonomy_mentions_only():
+    helper = module()
+    text = ('Xây dựng ứng dụng web full-stack và ứng dụng di động bằng React Native và Flutter; '
+            'phát triển game với Unity, UI/UX, microservices, Docker và DevOps.')
+    found = helper.normalize_mentions(text, helper.load_taxonomy())
+    tags = {match['tag'] for match in found}
+    assert {'web_development', 'full_stack_development', 'mobile_app_development',
+            'game_development', 'ui_ux_design', 'microservices', 'react_native',
+            'flutter', 'unity', 'docker', 'devops'} <= tags
+    assert all(match['evidence_type'] == 'inferred_from_thesis' for match in found)
+
+
 def test_nfd_unicode_matches_nfc_alias_with_exact_original_span():
     helper = module()
     phrase = unicodedata.normalize('NFD', 'thị giác máy tính')

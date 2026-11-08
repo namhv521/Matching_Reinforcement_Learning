@@ -10,3 +10,5 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}}
 
 .comparison-content{overflow-x:auto;max-width:100%}.comparison-content>table{min-width:760px}
+
+.semester-curve svg{min-width:800px;font-size:16px}.chart-legend span:nth-child(2):before{background:#334155}@media(min-width:950px){.training-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
