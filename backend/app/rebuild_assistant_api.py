@@ -79,7 +79,9 @@ def create_app(*,service=None,assistant=None,token=None,output=None,selection_ma
         knowledge=get_assistant(active)
         result=await run_in_threadpool(knowledge.answer,question,advisor_ids=ids or None,
                                       top_k=top_k,cohort_id=cohort_id,scope=scope)
-        return {**result,'advisor_selection_scope':('explicit_selected_profiles' if ids else 'all_approved_public_profiles')}
+        profile_scope = ('retrospective_public_sources' if active.versions.get('checkpoint_catalog')
+                         else 'all_approved_public_profiles')
+        return {**result,'advisor_selection_scope':('explicit_selected_profiles' if ids else profile_scope)}
 
     # Exact new routes must precede the existing catch-all StaticFiles mount.
     # Bootstrap adds a capability flag; every other P7 endpoint is retained.

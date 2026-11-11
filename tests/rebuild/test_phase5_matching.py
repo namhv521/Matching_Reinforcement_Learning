@@ -38,6 +38,20 @@ def test_global_hall_feasibility_and_safe_mask_preserve_future_fixed_assignments
 
 
 @pytest.mark.parametrize('algorithm', ['hungarian', 'greedy', 'random'])
+def test_quota_only_student_keeps_sole_eligible_slot(algorithm):
+    from src.evaluation.rebuild_benchmark import evaluate_problem
+
+    p = problem(available=np.array([[True, True], [False, False]]),
+                eligible=np.array([[True, True], [True, False]]))
+    result = evaluate_problem(p, algorithm, seed=42, quota_only=('s1',))
+    assert [row['advisor_id'] for row in result['assignments']] == ['a1', 'a0']
+    assert result['metrics']['scored_students'] == 1
+    assert result['metrics']['mean_compatibility'] == pytest.approx(.8)
+    assert result['trace'][-1]['score'] is None
+    assert result['trace'][-1]['policy_output']['kind'] == 'quota_only_random'
+
+
+@pytest.mark.parametrize('algorithm', ['hungarian', 'greedy', 'random'])
 def test_every_baseline_completes_safe_masks_and_never_uses_unknown_or_absent_pairs(algorithm):
     p = problem(eligible=np.array([[True, True], [True, False]]))
     result = solve(p, algorithm=algorithm, seed=9)

@@ -1,12 +1,13 @@
 import { requireSession } from "./portal.js";
-import { createCampus } from "./campus-scene.js";
 import { balancedQuotas } from "./student-cohorts.js";
 
 const $ = (id) => document.getElementById(id);
 const escape = (value = "") => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const labels = { ppo: "PPO", dqn: "DQN", hungarian: "Hungarian · baseline" };
+const labels = { ppo: "PPO", dqn: "DQN", hungarian: "Hungarian · baseline", greedy: "Greedy", random: "Random" };
 const state = { bootstrap: null, base: "", token: "", selected: new Set(), cohort: null, file: null, comparison: null, recommendation: null, algorithm: "ppo", busy: false, step: 0, playing: false, revision: 0, quotaVerified: false };
 let timer;
+let previewedWorkbook;
+let replayScene, loadingReplay, pageClosed;
 
 function nameStudent(id) { return state.cohort?.students?.find((s) => s.student_id === id)?.student_name || id; }
 function nameAdvisor(id) { return state.bootstrap?.advisors?.find((a) => a.advisor_id === id)?.advisor_name || id; }
@@ -18,6 +19,18 @@ function selectedIds() { return [...state.selected].sort(); }
 function message(text, kind = "info") { $("message").hidden = !text; $("message").className = kind; $("message").textContent = text; }
 function errorMessage(error) { return error.name === "AbortError" ? "Dịch vụ phản hồi quá lâu. Kiểm tra tiến trình local rồi thử lại." : error.message || "Không thể hoàn tất yêu cầu. Hãy thử lại."; }
 function importErrorText(code) {
+  const workbookErrors = {
+    request_size_limit: "File vượt giới hạn dung lượng.",
+    invalid_workbook: "Không đọc được Excel. Kiểm tra định dạng .xlsx, macro hoặc liên kết ngoài.",
+    workbook_name_column_required: "Thêm cột Họ và tên ở hàng đầu tiên.",
+    workbook_name_required: "Nhập tên sinh viên hoặc bỏ dòng nếu dòng này không dùng.",
+    duplicate_workbook_column: "Giữ một cột cho mỗi trường dữ liệu.",
+    workbook_text_required: "Đặt ô ở định dạng Văn bản và nhập lại giá trị.",
+    workbook_formula_or_error: "Thay công thức hoặc lỗi Excel bằng giá trị văn bản.",
+    workbook_sheet_limit: "Workbook có quá nhiều sheet.",
+    workbook_column_limit: "Sheet có quá nhiều cột. Giữ tối đa 64 cột.",
+  };
+  if (workbookErrors[code]) return workbookErrors[code];
   return ({ header_contract: "Tiêu đề cột chưa đúng mẫu. Tải CSV mẫu và giữ nguyên các tên cột.", row_width: "Số ô trong dòng không khớp tiêu đề. Kiểm tra dấu phẩy và dấu ngoặc kép.", file_size_limit: "File vượt giới hạn dung lượng.", row_count_limit: "File vượt số hồ sơ cho phép. Hãy chia thành các đợt nhỏ hơn.", malformed_csv: "Cấu trúc CSV chưa hợp lệ. Hãy lưu lại theo mẫu CSV UTF-8.", empty_dataset: "File chưa có hồ sơ sinh viên.", duplicate_identity: "Mã sinh viên bị trùng trong file.", unknown_taxonomy_tag: "Nhãn chưa có trong danh mục được duyệt.", taxonomy_group_mismatch: "Nhãn không thuộc nhóm dữ liệu của cột này.", tag_evidence_required: "Nhãn cần loại bằng chứng, tham chiếu nguồn và chất lượng bằng chứng.", unsupported_eligibility_flags_require_explicit_policy: "Điều kiện phân công chưa có chính sách xác nhận; hãy để trống trường này.", thesis_terms_do_not_prove_proficiency: "Thuật ngữ trong đề tài chưa chứng minh mức thành thạo cá nhân." })[code] || "Giá trị chưa đúng định dạng hoặc thiếu thông tin bắt buộc. Kiểm tra ô theo mẫu.";
 }
 
@@ -27,9 +40,14 @@ function updateControls() {
   for (const id of ["template", "csv-file", "advisor-search", "select-all", "clear-selection"]) $(id).disabled = !ready;
   $("advisor-list").disabled = !ready;
   $("validate").disabled = !ready || !state.file;
+  $("confirm-import").hidden = !previewedWorkbook;
+  $("confirm-import").disabled = !ready || !previewedWorkbook;
+  $("export-workbook").hidden = !state.cohort?.cohort_id || !/\.xlsx$/i.test(state.file?.name || "");
+  $("export-workbook").disabled = !ready || $("export-workbook").hidden;
   $("confirm-policy").disabled = !cohortReady || !state.quotaVerified;
   $("recommend").disabled = !cohortReady;
   $("compare").disabled = !cohortReady || !state.quotaVerified || !$("confirm-policy").checked;
+  $("checkpoint-version").disabled = !ready;
   $("export-json").disabled = !state.comparison || state.busy;
   $("export-csv").disabled = !currentResult()?.assignments?.length || state.busy;
   const assistantReady = ready && state.bootstrap?.assistant_ready === true;
@@ -39,11 +57,11 @@ function updateControls() {
 }
 function busy(value, text = "") { state.busy = value; document.body.setAttribute("aria-busy", String(value)); updateControls(); if (text) message(text); }
 
-async function api(path, body, { blob = false } = {}) {
+async function api(path, body, { blob = false, binary = false } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000);
   try {
-    const response = await fetch(`${state.base}/api/rebuild${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal, credentials: "same-origin", redirect: "error" });
+    const response = await fetch(`${state.base}/api/rebuild${path}`, { method: body === undefined ? "GET" : "POST", headers: { ...(body === undefined ? {} : { "Content-Type": binary ? "application/octet-stream" : "application/json" }) }, ...(body === undefined ? {} : { body: binary ? body : JSON.stringify(body) }), signal: controller.signal, credentials: "same-origin", redirect: "error" });
     if (response.ok && blob) return response.blob();
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -72,9 +90,15 @@ async function connect() {
     state.base = "";
     state.bootstrap = await api("/bootstrap");
     const retrospective = state.bootstrap.versions?.scope === 'retrospective_document_proxy';
-    if (retrospective) $("model-summary").textContent = "PPO dùng checkpoint được giữ sau validation. Lượt này chưa train DQN; Hungarian là phương pháp đối chiếu.";
+    const versions = state.bootstrap.checkpoint_versions || [];
+    $("checkpoint-field").hidden = !versions.length;
+    $("checkpoint-version").replaceChildren(...versions.map(v => new Option(`${v} · vòng cuối`, v)));
+    if (versions.includes("V3")) $("checkpoint-version").value = "V3";
+    if (retrospective) $("model-summary").textContent = versions.length
+      ? "Chọn V1, V2 hoặc V3 để so sánh PPO và DQN cùng các baseline trên snapshot của version đó."
+      : "Các checkpoint hiển thị bên trên dùng dữ liệu hồi cứu.";
     $("model-source").textContent = retrospective ? "Nguồn: khóa luận và corpus giảng viên hồi cứu. PPO dùng encoder cố định và chia đều chỉ tiêu theo danh sách đã chọn; chưa xác nhận chất lượng hướng dẫn thực tế." : state.bootstrap.versions?.github_bundle_run_id ? "Nguồn: hồ sơ FIT NEU và GitHub đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota." : "Nguồn: hồ sơ FIT NEU đã duyệt. Điểm phù hợp dùng bộ đặc trưng cố định; PPO/DQN học cách phân bổ theo quota.";
-    $("model-status").innerHTML = (state.bootstrap.algorithms || []).toSorted((a,b)=>["ppo","dqn","hungarian"].indexOf(a.id)-["ppo","dqn","hungarian"].indexOf(b.id)).map(a => `<div class="model-row"><b>${escape(labels[a.id] || a.id)}</b><small>${a.id === 'hungarian' ? 'Thuật toán tối ưu có quota · baseline' : retrospective ? 'Model nghiên cứu · tài liệu hồi cứu' : 'Học tăng cường · dữ liệu nguồn đã duyệt'}</small><span class="${a.ready ? 'status-good' : 'status-warn'}">${a.ready ? 'Sẵn sàng' : 'Chưa khả dụng'}</span></div>`).join('');
+    $("model-status").innerHTML = (state.bootstrap.algorithms || []).toSorted((a,b)=>["ppo","dqn","hungarian","greedy","random"].indexOf(a.id)-["ppo","dqn","hungarian","greedy","random"].indexOf(b.id)).map(a => `<div class="model-row"><b>${escape(labels[a.id] || a.id)}</b><small>${a.id === 'hungarian' ? 'Thuật toán tối ưu có quota · baseline' : retrospective ? 'Model nghiên cứu · tài liệu hồi cứu' : 'Học tăng cường · dữ liệu nguồn đã duyệt'}</small><span class="${a.ready ? 'status-good' : 'status-warn'}">${a.ready ? 'Sẵn sàng' : 'Chưa khả dụng'}</span></div>`).join('');
     renderAdvisors(); renderQuota(); message("");
   } catch(error) { message(errorMessage(error), "error"); }
   finally { busy(false); }
@@ -115,25 +139,36 @@ function renderImport(value) {
   const errorRows = errors.map((r) => `<tr><td>${escape(r.row)}</td><td>${escape(r.column)}</td><td>${escape(importErrorText(r.code))}<details><summary>Mã kiểm tra</summary>${escape(r.code || r.message)}</details></td></tr>`).join("");
   const studentRows = (value.students || []).slice(0, 10).map((s) => `<tr><td>${escape(s.student_name || s.student_id)}<small>${escape(s.student_id)}</small></td><td>${escape(s.thesis_title)}</td></tr>`).join("");
   const table = errors.length
-    ? `<table><caption>Lỗi CSV theo từng dòng</caption><thead><tr><th>Dòng</th><th>Cột</th><th>Vấn đề</th></tr></thead><tbody>${errorRows}</tbody></table>`
+    ? `<table><caption>Lỗi theo từng dòng</caption><thead><tr><th>Dòng</th><th>Cột</th><th>Vấn đề</th></tr></thead><tbody>${errorRows}</tbody></table>`
     : `<table><caption>Xem trước hồ sơ đã nhập</caption><thead><tr><th>Sinh viên</th><th>Đề tài</th></tr></thead><tbody>${studentRows}</tbody></table>`;
   const title = value.valid ? `${value.row_count} hồ sơ hợp lệ` : `${errors.length} lỗi cần sửa trước khi tiếp tục`;
   $("import-result").innerHTML = `<p class="${value.valid ? "status-good" : "status-error"}"><strong>${escape(title)}</strong></p>${warnings(value.warnings)}<div class="table-scroll">${table}</div>${!errors.length && value.row_count > 10 ? `<p class="help">Hiển thị 10/${value.row_count} hồ sơ.</p>` : ""}`;
 }
 
-async function importStudents(event) {
-  event.preventDefault(); if (!state.file) return;
-  busy(true, "Đang kiểm tra cấu trúc và bằng chứng trong CSV…"); state.cohort = null; state.quotaVerified = false; clearResults();
+async function importStudents(event, confirm = false) {
+  event.preventDefault();
+  if (state.busy || !state.file || (confirm && previewedWorkbook !== state.file)) return;
+  previewedWorkbook = null;
+  busy(true, confirm ? "Đang lưu danh sách…" : "Đang kiểm tra danh sách…"); state.cohort = null; state.quotaVerified = false; clearResults();
   try {
     const limit = state.bootstrap?.limits?.max_csv_bytes || 10 * 1024 * 1024;
     if (state.file.size > limit) throw new Error(`File vượt giới hạn ${Math.round(limit / 1024 / 1024)} MB. Hãy chia nhỏ cohort.`);
-    let csvText;
-    try { csvText = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await state.file.arrayBuffer()); }
-    catch { throw new Error("CSV chưa phải UTF-8 hợp lệ. Hãy lưu lại file theo định dạng CSV UTF-8 rồi thử lại."); }
-    const value = await api("/students/validate", { csv_text: csvText }); state.cohort = value; renderImport(value);
+    const workbook = /\.xlsx$/i.test(state.file.name);
+    let value;
+    if (workbook) {
+      value = await api(`/students/workbook?confirm=${confirm}`, state.file, { binary: true });
+      if (value.valid && !confirm) previewedWorkbook = state.file;
+    } else {
+      let csvText;
+      try { csvText = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(await state.file.arrayBuffer()); }
+      catch { throw new Error("CSV chưa phải UTF-8 hợp lệ. Hãy lưu lại file theo định dạng CSV UTF-8 rồi thử lại."); }
+      value = await api("/students/validate", { csv_text: csvText });
+    }
+    state.cohort = value.cohort_id ? value : null;
+    renderImport(value);
     state.revision++; $("confirm-policy").checked = false; renderQuota();
-    message(value.valid ? "Hồ sơ đã hợp lệ. Chọn giảng viên và kiểm tra quota để tiếp tục." : "Sửa các dòng báo lỗi rồi chọn lại CSV.", value.valid ? "success" : "error");
-    if (value.valid) await verifyQuota();
+    message(!value.valid ? "Sửa các dòng báo lỗi rồi chọn lại file." : previewedWorkbook ? "Kiểm tra danh sách rồi bấm Xác nhận danh sách." : "Danh sách đã được lưu. Chọn giảng viên để kiểm tra quota.", value.valid ? "success" : "error");
+    if (state.cohort) await verifyQuota();
   } catch (error) { message(errorMessage(error), "error"); $("import-result").textContent = "Chưa có hồ sơ hợp lệ cho lần nhập này."; }
   finally { busy(false); }
 }
@@ -151,24 +186,46 @@ async function recommend() {
 
 async function compare() {
   if (!$("confirm-policy").checked) return;
-  busy(true, "Đang chạy PPO, DQN và Hungarian trên cùng cohort…"); stop();
+  busy(true, "Đang so sánh các phương pháp trên cùng danh sách…"); stop();
   try {
-    state.comparison = await api("/compare", { cohort_id: state.cohort.cohort_id, advisor_ids: selectedIds(), coordinator_confirmed: true });
+    const version = $("checkpoint-version").value;
+    state.comparison = await api("/compare", { cohort_id: state.cohort.cohort_id, advisor_ids: selectedIds(), coordinator_confirmed: true, ...(version ? { checkpoint_version: version } : {}) });
     const entries = Object.entries(state.comparison.results || {}); const preferred = ["ppo", "dqn", "hungarian"].find((key) => state.comparison.results[key]?.trace?.length);
     state.algorithm = preferred || entries[0]?.[0] || "hungarian"; state.step = 0;
     $("comparison-result").className = "comparison-content";
-    $("comparison-result").innerHTML = `<div class="comparison-cards">${['ppo','dqn','hungarian'].map(id => {const r=state.comparison.results[id];return `<article class="comparison-model" data-model="${id}"><h3>${escape(labels[id])}</h3><p>${id==='ppo'?'Học chính sách phân bổ':id==='dqn'?'Học giá trị từng lựa chọn':'Tối ưu toàn cục · đối chiếu'}</p><span class="metric">${number(r?.metrics?.mean_compatibility,3)}</span><p>Điểm phù hợp trung bình</p><p>${r?.status==='feasible'?'Phân bổ hợp lệ':'Chưa có phân bổ hợp lệ'}</p></article>`;}).join('')}</div><table><caption>Kết quả từng thuật toán</caption><thead><tr><th>Thuật toán</th><th>Trạng thái</th><th class="number">Điểm mục tiêu</th><th class="number">Phù hợp trung bình</th><th class="number">Chênh tải chuẩn hóa</th><th class="number">Thời gian (giây)</th><th class="number">Phân bổ đủ</th><th class="number">Vi phạm quota</th></tr></thead><tbody>${["ppo", "dqn", "hungarian"].filter((id) => state.comparison.results[id]).map((id) => { const r = state.comparison.results[id]; return `<tr><td><strong>${escape(labels[id])}</strong></td><td>${escape(r.status === "feasible" ? "Hợp lệ" : r.status === "infeasible" ? "Không khả thi" : r.status)}${r.diagnostics || r.diagnostic ? `<details><summary>Chi tiết</summary>${jsonDetails(r.diagnostics || r.diagnostic)}</details>` : ""}</td><td class="number">${number(r.metrics?.objective, 3)}</td><td class="number">${number(r.metrics?.mean_compatibility, 3)}</td><td class="number">${number(r.metrics?.normalized_load_imbalance, 3)}</td><td class="number">${number(r.elapsed_seconds, 4)}</td><td class="number">${typeof r.metrics?.coverage === "number" ? `${number(r.metrics.coverage * 100)}%` : "—"}</td><td class="number">${number(r.metrics?.constraint_violations, 0)}</td></tr>`; }).join("")}</tbody></table>${warnings(state.comparison.warnings)}<p class="help">Phù hợp trung bình là điểm đặc trưng của các cặp đã phân bổ. Chênh tải chuẩn hóa là chênh lệch lớn nhất giữa tỷ lệ tải/quota của các giảng viên (thấp hơn là cân bằng hơn). Các chỉ số phục vụ so sánh cùng đầu vào, chưa phải độ chính xác hoặc kết quả hướng dẫn thực tế.</p>`;
+    $("comparison-result").innerHTML = `<div class="comparison-cards">${entries.map(([id]) => {const r=state.comparison.results[id];return `<article class="comparison-model" data-model="${id}"><h3>${escape(labels[id] || id)}</h3><p>${id==='ppo'?'Học chính sách phân bổ':id==='dqn'?'Học giá trị từng lựa chọn':id==='hungarian'?'Tối ưu toàn cục':id==='greedy'?'Chọn cặp tốt nhất còn khả thi':'Lấy mẫu có seed'}</p><span class="metric">${number(r?.metrics?.mean_compatibility,3)}</span><p>Điểm phù hợp trung bình${r?.metrics?.scored_students !== undefined ? ` · ${number(r.metrics.scored_students,0)} SV có điểm` : ""}</p><meter min="0" max="1" value="${Number(r?.metrics?.mean_compatibility ?? 0)}" aria-label="Điểm tương thích trung bình" ${r?.metrics?.mean_compatibility == null ? "hidden" : ""}></meter><p>${r?.status==='feasible'?'Phân bổ hợp lệ':'Chưa có phân bổ hợp lệ'}</p></article>`;}).join('')}</div><table><caption>Kết quả từng thuật toán</caption><thead><tr><th>Thuật toán</th><th>Trạng thái</th><th class="number">Điểm mục tiêu</th><th class="number">Phù hợp trung bình</th><th class="number">Chênh tải chuẩn hóa</th><th class="number">Thời gian (giây)</th><th class="number">Phân bổ đủ</th><th class="number">Vi phạm quota</th></tr></thead><tbody>${entries.map(([id]) => { const r = state.comparison.results[id]; return `<tr><td><strong>${escape(labels[id] || id)}</strong></td><td>${escape(r.status === "feasible" ? "Hợp lệ" : r.status === "infeasible" ? "Không khả thi" : r.status)}${r.diagnostics || r.diagnostic ? `<details><summary>Chi tiết</summary>${jsonDetails(r.diagnostics || r.diagnostic)}</details>` : ""}</td><td class="number">${number(r.metrics?.objective, 3)}</td><td class="number">${number(r.metrics?.mean_compatibility, 3)}</td><td class="number">${number(r.metrics?.normalized_load_imbalance, 3)}</td><td class="number">${number(r.elapsed_seconds, 4)}</td><td class="number">${typeof r.metrics?.coverage === "number" ? `${number(r.metrics.coverage * 100)}%` : "—"}</td><td class="number">${number(r.metrics?.constraint_violations, 0)}</td></tr>`; }).join("")}</tbody></table>${warnings(state.comparison.warnings)}<p class="help">Phù hợp trung bình là điểm đặc trưng của các cặp đã phân bổ. Chênh tải chuẩn hóa là chênh lệch lớn nhất giữa tỷ lệ tải/quota của các giảng viên (thấp hơn là cân bằng hơn). Các chỉ số phục vụ so sánh cùng đầu vào, chưa phải độ chính xác hoặc kết quả hướng dẫn thực tế.</p>`;
     $("result-algorithm").innerHTML = entries.map(([key]) => `<option value="${escape(key)}" ${key === state.algorithm ? "selected" : ""}>${escape(labels[key] || key)}</option>`).join("");
     $("allocation-panel").hidden = !entries.length;
+    $("student-comparison-id").replaceChildren(...state.cohort.students.map(
+      s => new Option(`${s.student_name || s.student_id} · ${s.student_id}`, s.student_id)));
+    renderStudentComparison();
     renderAssignments(); renderReplay(); message("Đã hoàn tất so sánh. Mở bảng phân bổ hoặc phát lại từng quyết định.", "success");
   } catch (error) { message(errorMessage(error), "error"); }
   finally { busy(false); }
 }
 
 function currentResult() { return state.comparison?.results?.[state.algorithm]; }
+function renderStudentComparison() {
+  const id = $("student-comparison-id").value;
+  const rows = Object.entries(state.comparison?.results || {}).map(([algorithm, result]) => {
+    const pair = result.assignments?.find(row => row.student_id === id);
+    const point = pair?.score;
+    return `<li><span>${escape(labels[algorithm] || algorithm)}</span><span>${escape(pair ? nameAdvisor(pair.advisor_id) : "Chưa có phân công")}</span><span>${score(point)}</span>${typeof point === "number" ? `<meter min="0" max="1" value="${point}" aria-label="Điểm tương thích"></meter>` : ""}</li>`;
+  });
+  $("student-comparison-chart").innerHTML = `<ul class="advisor-load-list">${rows.join("")}</ul>`;
+}
 function renderAssignments() {
   const rows = currentResult()?.assignments || [];
-  $("assignments-table").innerHTML = rows.length ? `<table><caption>Đề xuất phân bổ · ${escape(labels[state.algorithm] || state.algorithm)}</caption><thead><tr><th>Sinh viên</th><th>Giảng viên</th><th class="number">Điểm phù hợp</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escape(nameStudent(r.student_id))}<small>${escape(r.student_id)}</small></td><td>${escape(nameAdvisor(r.advisor_id))}</td><td class="number">${score(r.score ?? currentResult().trace?.find((t) => t.student_id === r.student_id)?.score)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty-state">Thuật toán chưa tạo được phân bổ hợp lệ. Xem chẩn đoán ở bảng so sánh.</p>`; updateControls();
+  const counts = new Map();
+  for (const row of rows) counts.set(row.advisor_id, (counts.get(row.advisor_id) || 0) + 1);
+  const capacities = state.comparison?.policy?.capacities || [];
+  const advisorIds = currentResult()?.trace?.[0]?.advisor_ids || state.bootstrap?.advisors?.map(a => a.advisor_id) || [];
+  $("advisor-load-chart").innerHTML = rows.length ? `<details><summary>Số sinh viên theo giảng viên</summary><ul class="advisor-load-list">${advisorIds.map((id, index) => {
+    const quota = Number(capacities[index] || 0);
+    const count = counts.get(id) || 0;
+    return quota ? `<li><span>${escape(nameAdvisor(id))}</span><meter min="0" max="${quota}" value="${count}" aria-label="${escape(nameAdvisor(id))}"></meter><span>${count}/${quota} SV</span></li>` : "";
+  }).join("")}</ul></details>` : "";
+  $("assignments-table").innerHTML = rows.length ? `<table><caption>Đề xuất phân bổ · ${escape(labels[state.algorithm] || state.algorithm)}</caption><thead><tr><th>Sinh viên</th><th>Giảng viên</th><th class="number">Điểm phù hợp</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escape(nameStudent(r.student_id))}<small>${escape(r.student_id)}</small></td><td>${escape(nameAdvisor(r.advisor_id))}${r.assignment_mode === "quota_only" ? "<small>Ghép theo quota còn lại</small>" : ""}</td><td class="number">${score(r.score ?? currentResult().trace?.find((t) => t.student_id === r.student_id)?.score)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty-state">Thuật toán chưa tạo được phân bổ hợp lệ. Xem chẩn đoán ở bảng so sánh.</p>`; updateControls();
 }
 
 function stop() { clearInterval(timer); state.playing = false; if ($("play")) $("play").textContent = "Phát"; }
@@ -179,13 +236,22 @@ function renderReplay() {
   $("play").disabled = !trace.length; $("reset-replay").disabled = !trace.length;
   const decision = trace[state.step - 1];
   const sceneRegistry = decision?.advisor_registry || trace[0]?.advisor_registry || [];
+  if (trace.length && !replayScene && !loadingReplay) {
+    loadingReplay = import("./campus-scene.js").then(({ createCampus }) => {
+      if (pageClosed) return;
+      replayScene = createCampus($("allocation-scene"), {replay:true});
+      $("replay-motion").hidden = !replayScene;
+      if (replayScene) $("replay-motion").textContent = replayScene.paused ? "Bật chuyển động 3D" : "Tạm dừng chuyển động 3D";
+      if (replayScene) renderReplay();
+    }).catch(() => { $("replay-motion").hidden = true; });
+  }
   replayScene?.update(decision, sceneRegistry, sceneRegistry.map(nameAdvisor), state.step, trace[0]?.capacities || []);
   $("scene-explanation").textContent = decision ? `Bước ${state.step}: ${nameStudent(decision.student_id)} được đề xuất cho ${nameAdvisor(decision.advisor_id)}. Các thanh bên dưới cho biết số chỗ đã dùng.` : "Nhân vật đội mũ là sinh viên; người cầm sách là giảng viên. Nhấn Phát để xem từng đề xuất thực.";
   $("current-decision").className = decision ? "" : "empty-state";
   $("current-decision").innerHTML = decision ? `<strong>${escape(nameStudent(decision.student_id))}</strong> → <strong>${escape(nameAdvisor(decision.advisor_id))}</strong><p>Có ${decision.pre_action_mask?.filter(Boolean).length ?? "—"} giảng viên còn đủ điều kiện ở bước này. Điểm phù hợp của cặp: ${score(decision.score_known ? decision.score : null)}.</p><details><summary>Điểm thành phần và đầu ra mô hình</summary>${jsonDetails({ reward: decision.reward_components, preference: decision.preference_known ? decision.preference : "Chưa biết", policy_output: decision.policy_output || { status: "Không có đầu ra policy/Q được cung cấp" } })}</details>` : trace.length ? "Bắt đầu phát để xem sinh viên, lựa chọn hợp lệ và tải giảng viên ở từng bước." : "Trace sẽ xuất hiện sau lần phân bổ đầu tiên.";
   const registry = decision?.advisor_registry || trace[0]?.advisor_registry || []; const capacities = decision?.capacities || trace[0]?.capacities || []; const loads = decision?.loads_after || registry.map(() => 0);
   $("load-chart").innerHTML = registry.map((id, i) => capacities[i] > 0 ? `<div class="load-row"><span>${escape(nameAdvisor(id))}</span><b>${loads[i] || 0}/${capacities[i]}</b><progress value="${loads[i] || 0}" max="${capacities[i]}" aria-label="Tải ${escape(nameAdvisor(id))}"></progress></div>` : "").join("");
-  $("trace-table").innerHTML = trace.length ? `<table><caption>Trace quyết định thực · ${escape(labels[state.algorithm] || state.algorithm)}</caption><thead><tr><th>Bước</th><th>Sinh viên</th><th>Giảng viên</th><th class="number">Điểm</th><th class="number">Reward</th><th>Trạng thái</th></tr></thead><tbody>${trace.map((r, i) => `<tr ${i + 1 === state.step ? 'aria-current="step"' : ""}><td>${i + 1}</td><td>${escape(nameStudent(r.student_id))}</td><td>${escape(nameAdvisor(r.advisor_id))}</td><td class="number">${score(r.score_known ? r.score : null)}</td><td class="number">${number(r.total_reward, 4)}</td><td>${i < state.step ? "Đã phát" : "Chưa phát"}</td></tr>`).join("")}</tbody></table>` : "";
+  $("trace-table").innerHTML = trace.length ? `<table><caption>Trace quyết định thực · ${escape(labels[state.algorithm] || state.algorithm)}</caption><thead><tr><th>Bước</th><th>Sinh viên</th><th>Giảng viên</th><th class="number">Điểm</th><th class="number">Reward</th><th>Trạng thái</th></tr></thead><tbody>${trace.map((r, i) => `<tr ${i + 1 === state.step ? 'aria-current="step"' : ""}><td>${i + 1}</td><td>${escape(nameStudent(r.student_id))}</td><td>${escape(nameAdvisor(r.advisor_id))}${r.assignment_mode === "quota_only" ? "<small>Ghép theo quota còn lại</small>" : ""}</td><td class="number">${score(r.score_known ? r.score : null)}</td><td class="number">${number(r.total_reward, 4)}</td><td>${i < state.step ? "Đã phát" : "Chưa phát"}</td></tr>`).join("")}</tbody></table>` : "";
 }
 function play() {
   if (state.playing) { stop(); return; }
@@ -195,11 +261,19 @@ function play() {
   timer = setInterval(() => { state.step++; renderReplay(); if (state.step >= trace.length) stop(); }, 1000 / Number($("replay-speed").value));
 }
 
-function csvCell(value) { let text = String(value ?? ""); if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`; return `"${text.replaceAll('"', '""')}"`; }
-function exportCsv() {
-  const rows = currentResult()?.assignments || [];
-  const values = [["student_id", "student_name", "advisor_id", "advisor_name", "score", "algorithm"], ...rows.map((r) => [r.student_id, nameStudent(r.student_id), r.advisor_id, nameAdvisor(r.advisor_id), r.score ?? currentResult().trace?.find((t) => t.student_id === r.student_id)?.score ?? "", state.algorithm])];
-  download(new Blob(["\uFEFF", values.map((row) => row.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" }), `unimatch-${state.algorithm}-allocation.csv`);
+async function exportCsv() {
+  const run = state.comparison?.run_id;
+  const algorithm = state.algorithm;
+  if (!run || state.busy) return;
+  busy(true);
+  try {
+    const file = await api(`/runs/${encodeURIComponent(run)}/${encodeURIComponent(algorithm)}.csv`, undefined, { blob: true });
+    download(file, `unimatch-${algorithm}-allocation.csv`);
+  } catch (error) {
+    message(errorMessage(error), "error");
+  } finally {
+    busy(false);
+  }
 }
 
 async function ask(event) {
@@ -219,8 +293,23 @@ async function ask(event) {
 }
 
 $("template").addEventListener("click", async () => { busy(true); try { download(await api("/templates/students.csv", undefined, { blob: true }), "unimatch-students-template.csv"); } catch (e) { message(errorMessage(e), "error"); } finally { busy(false); } });
-$("csv-file").addEventListener("change", () => { state.file = $("csv-file").files[0] || null; state.cohort = null; state.quotaVerified = false; state.revision++; $("file-info").textContent = state.file ? `${state.file.name} · ${number(state.file.size / 1024)} KB` : "Chưa chọn file."; $("confirm-policy").checked = false; $("import-result").textContent = "Chọn “Kiểm tra hồ sơ” để kiểm tra file mới."; clearResults(); renderQuota(); updateControls(); });
+$("csv-file").addEventListener("change", () => { state.file = $("csv-file").files[0] || null; previewedWorkbook = null; state.cohort = null; state.quotaVerified = false; state.revision++; $("file-info").textContent = state.file ? `${state.file.name} · ${number(state.file.size / 1024)} KB` : "Chưa chọn file."; $("confirm-policy").checked = false; $("import-result").textContent = "Chọn “Kiểm tra hồ sơ” để kiểm tra file mới."; clearResults(); renderQuota(); updateControls(); });
 $("import-form").addEventListener("submit", importStudents);
+$("confirm-import").addEventListener("click", event => importStudents(event, true));
+$("export-workbook").addEventListener("click", async () => {
+  const id = state.cohort?.cohort_id;
+  if (!id || state.busy) return;
+  busy(true, "Đang tạo Excel chuẩn…");
+  try {
+    const file = await api(`/cohorts/${encodeURIComponent(id)}/students.xlsx`, undefined, { blob: true });
+    download(file, "unimatch-sinh-vien.xlsx");
+    message("Excel chuẩn đã sẵn sàng để nhập lại.");
+  } catch (error) {
+    message(errorMessage(error), "error");
+  } finally {
+    busy(false);
+  }
+});
 $("advisor-search").addEventListener("input", renderAdvisors);
 $("advisor-list").addEventListener("change", (event) => { const id = event.target.dataset.advisor; if (!id) return; if (event.target.checked) state.selected.add(id); else state.selected.delete(id); selectionChanged(); });
 function selectionChanged() { state.revision++; state.quotaVerified = false; $("confirm-policy").checked = false; clearResults(); renderAdvisors(); renderQuota(); updateControls(); void verifyQuota(); }
@@ -229,16 +318,20 @@ $("clear-selection").addEventListener("click", () => { state.selected.clear(); s
 $("confirm-policy").addEventListener("change", updateControls);
 $("recommend").addEventListener("click", recommend); $("compare").addEventListener("click", compare);
 $("result-algorithm").addEventListener("change", () => { stop(); state.algorithm = $("result-algorithm").value; state.step = 0; renderAssignments(); renderReplay(); });
+$("student-comparison-id").addEventListener("change", renderStudentComparison);
+$("checkpoint-version").addEventListener("change", clearResults);
 $("previous-step").addEventListener("click", () => { stop(); state.step--; renderReplay(); });
 $("next-step").addEventListener("click", () => { stop(); state.step++; renderReplay(); });
 $("reset-replay").addEventListener("click", () => { stop(); state.step = 0; renderReplay(); });
 $("play").addEventListener("click", play); $("replay-speed").addEventListener("change", () => { if (state.playing) { stop(); play(); } });
 $("export-json").addEventListener("click", () => download(new Blob([JSON.stringify(state.comparison, null, 2)], { type: "application/json" }), "unimatch-comparison.json"));
 $("export-csv").addEventListener("click", exportCsv); $("assistant-form").addEventListener("submit", ask);
-const replayScene = createCampus($("allocation-scene"), {replay:true});
 const motionButton=$("replay-motion");
-if(replayScene){motionButton.textContent=replayScene.paused?'Bật chuyển động 3D':'Tạm dừng chuyển động 3D';motionButton.addEventListener('click',()=>{motionButton.textContent=replayScene.toggle()?'Bật chuyển động 3D':'Tạm dừng chuyển động 3D';});}else motionButton.hidden=true;
-addEventListener('pagehide',()=>{stop();replayScene?.destroy();},{once:true});
+motionButton.hidden = true;
+motionButton.addEventListener('click', () => {
+  if (replayScene) motionButton.textContent = replayScene.toggle() ? 'Bật chuyển động 3D' : 'Tạm dừng chuyển động 3D';
+});
+addEventListener('pagehide',()=>{pageClosed=true;stop();replayScene?.destroy();},{once:true});
 document.querySelectorAll('[data-question]').forEach(button=>button.addEventListener('click',()=>{$("assistant-question").value=button.dataset.question;if(!$("ask").disabled)$("assistant-form").requestSubmit();}));
 updateControls(); renderReplay();
 const user=await requireSession();

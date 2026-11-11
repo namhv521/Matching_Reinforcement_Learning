@@ -54,10 +54,34 @@ if __name__=='__main__':
     parser.add_argument('--port',type=int,default=8767)
     parser.add_argument('--token-file',type=Path)
     parser.add_argument('--semester-run',type=Path,help='Completed semester run containing suites/ and training/.')
+    parser.add_argument('--checkpoint-catalog', action='store_true', help='Serve all six Strict GitHub research checkpoints.')
     parser.add_argument('--semester-inputs',type=Path,default=ROOT/'data/training_prepared_20261101')
     parser.add_argument('--env-file',type=Path,default=ROOT/'.env',help='Local OAuth/settings file; existing process variables take precedence.')
     parser.add_argument('--selection',type=Path,help='Explicit verified model-selection manifest')
     args=parser.parse_args()
+    if args.checkpoint_catalog and (args.semester_run or args.selection):
+        parser.error('--checkpoint-catalog has its own checkpoint selection')
+    if args.checkpoint_catalog:
+        from dotenv import load_dotenv
+        if args.env_file.is_file():
+            load_dotenv(args.env_file)
+        if os.environ.get('UNIMATCH_DEPLOYMENT') == 'production':
+            parser.error('--checkpoint-catalog is a loopback research portal')
+        runtime = ROOT/'data_rebuild/runtime/strict_catalog'
+        os.environ['UNIMATCH_AUTH_DB'] = str(runtime/'portal.sqlite3')
+        os.environ['UNIMATCH_DATABASE_URL'] = str(runtime/'portal.sqlite3')
+        os.environ['UNIMATCH_PUBLIC_ORIGIN'] = f'http://127.0.0.1:{args.port}'
+        from backend.app.rebuild_assistant_api import create_app
+        from src.serving.semester_catalog import load_catalog
+        import torch
+        import uvicorn
+        torch.set_num_threads(1)
+        service, assistant = load_catalog(ROOT/'outputs', runtime/'proposals')
+        app = create_app(service=service, assistant=assistant,
+                         token=load_local_token(args.token_file or runtime/'access.token'))
+        print(f'Local workspace: http://127.0.0.1:{args.port}/login.html', flush=True)
+        uvicorn.run(app, host='127.0.0.1', port=args.port, access_log=False)
+        raise SystemExit(0)
     current_semester_run=ROOT/'outputs/semester_rl_20261101'
     if not args.semester_run and not args.selection and (current_semester_run/'training/selection.json').is_file():
         args.semester_run=current_semester_run

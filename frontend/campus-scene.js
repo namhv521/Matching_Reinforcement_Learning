@@ -105,19 +105,32 @@ export function createCampus(canvas, { replay = false } = {}) {
     camera.position.set(10, 9, 13).multiplyScalar((width < 400 ? 1.2 : 1) * (replay ? .76 : 1)); camera.lookAt(0, .4, 0); camera.updateProjectionMatrix(); draw();
   }
   const observer = new ResizeObserver(resize); observer.observe(canvas);
-  const intersection = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; }); intersection.observe(canvas);
+  function schedule() {
+    if (paused || !visible || document.hidden) {
+      cancelAnimationFrame(frame);
+      frame = undefined;
+      previous = 0;
+    } else if (frame === undefined) {
+      frame = requestAnimationFrame(tick);
+    }
+  }
+  const intersection = new IntersectionObserver(entries => { visible = entries[0].isIntersecting; schedule(); }); intersection.observe(canvas);
   function tick(time) {
-    frame = requestAnimationFrame(tick); const dt = Math.min((time - previous) / 1000, .05); previous = time;
+    frame = undefined;
     if (paused || !visible || document.hidden) return;
+    const dt = previous ? Math.min((time - previous) / 1000, .05) : 0;
+    previous = time;
     elapsed += dt;
     root.rotation.y += (pointerX * .16 - root.rotation.y) * .04;
     root.rotation.x += (pointerY * .03 - root.rotation.x) * .04;
     if (!replay) actors.forEach((actor, index) => { actor.position.y = (index < 3 ? .18 : index === 3 ? 3 : 3.5) + Math.sin(elapsed * 1.2 + index) * .07; });
     if (active) { currentTarget.lerp(target, Math.min(dt * 4, 1)); active.position.copy(currentTarget); active.position.y += Math.sin(elapsed * 9) * .035; }
     draw();
+    schedule();
   }
   const pointer = event => { const rect = canvas.getBoundingClientRect(); pointerX = (event.clientX - rect.left) / rect.width - .5; pointerY = (event.clientY - rect.top) / rect.height - .5; };
-  canvas.addEventListener('pointermove', pointer); resize(); frame = requestAnimationFrame(tick);
+  document.addEventListener('visibilitychange', schedule);
+  canvas.addEventListener('pointermove', pointer); resize(); schedule();
   function dispose(object) { object.traverse(value => { value.geometry?.dispose(); if (value.material?.map) value.material.map.dispose(); if (value.material && !Object.values(colors).includes(value.material)) value.material.dispose(); }); }
-  return { update, get paused() { return paused; }, toggle() { paused = !paused; draw(); return paused; }, destroy() { cancelAnimationFrame(frame); observer.disconnect(); intersection.disconnect(); canvas.removeEventListener('pointermove', pointer); dispose(root); Object.values(colors).forEach(value => value.dispose()); renderer.dispose(); } };
+  return { update, get paused() { return paused; }, toggle() { paused = !paused; draw(); schedule(); return paused; }, destroy() { cancelAnimationFrame(frame); observer.disconnect(); intersection.disconnect(); document.removeEventListener('visibilitychange', schedule); canvas.removeEventListener('pointermove', pointer); dispose(root); Object.values(colors).forEach(value => value.dispose()); renderer.dispose(); } };
 }

@@ -229,10 +229,11 @@ class CSVRecord(BaseModel):
         return self
 
 
-def _model(entity):
+def _model(entity, *, allow_blank_thesis_title=False):
     fields = {}
     for name in HEADERS[entity]:
-        annotation = Text if name in REQUIRED[entity] else OptionalText
+        required = name in REQUIRED[entity] and not (allow_blank_thesis_title and name == 'thesis_title')
+        annotation = Text if required else OptionalText
         if name == 'schema_version':
             annotation = Annotated[Literal['1.0'], BeforeValidator(_text)]
         elif name == 'review_status':
@@ -259,11 +260,13 @@ def _model(entity):
             annotation = Integer
         elif name == 'active_for_semester':
             annotation = Boolean
-        fields[name] = (annotation, ... if name in REQUIRED[entity] else None)
-    return create_model(entity.title() + 'ImportV1', __base__=CSVRecord, **fields)
+        fields[name] = (annotation, ... if required else None)
+    name = 'StudentWorkbookIntakeV1' if allow_blank_thesis_title else entity.title() + 'ImportV1'
+    return create_model(name, __base__=CSVRecord, **fields)
 
 
 MODELS = {entity: _model(entity) for entity in HEADERS}
+STUDENT_WORKBOOK_MODEL = _model('students', allow_blank_thesis_title=True)
 
 
 def _check_options(entity, mode):
@@ -273,9 +276,11 @@ def _check_options(entity, mode):
         raise ValueError('mode must be staging, gold or allocation')
 
 
-def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None, allow_unknown_document_confidence=False):
+def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None, allow_unknown_document_confidence=False,
+              *, student_workbook=False):
     try:
-        model = MODELS[entity].model_validate(row, context={
+        schema = STUDENT_WORKBOOK_MODEL if student_workbook else MODELS[entity]
+        model = schema.model_validate(row, context={
             'mode': mode, 'taxonomy_ids': taxonomy_ids, 'taxonomy_groups': taxonomy_groups,
             'allow_unknown_document_confidence': allow_unknown_document_confidence})
         return model, []
@@ -291,10 +296,13 @@ def _validate(row, entity, mode, taxonomy_ids, taxonomy_groups=None, allow_unkno
 
 def validate_row(row: dict, entity: str, *, mode='staging', taxonomy_ids: set[str] | None = None,
                  taxonomy_groups: dict[str, set[str]] | None = None,
-                 allow_unknown_document_confidence=False) -> list[dict]:
+                 allow_unknown_document_confidence=False, student_workbook=False) -> list[dict]:
     """Validate one candidate; no mutation, missing-to-zero fill, or approval."""
     _check_options(entity, mode)
-    return _validate(row, entity, mode, taxonomy_ids, taxonomy_groups, allow_unknown_document_confidence)[1]
+    if student_workbook and (entity != 'students' or mode != 'staging'):
+        raise ValueError('student_workbook_requires_staging')
+    return _validate(row, entity, mode, taxonomy_ids, taxonomy_groups, allow_unknown_document_confidence,
+                     student_workbook=student_workbook)[1]
 
 
 def export_json_schema(entity: str) -> dict:

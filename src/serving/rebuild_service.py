@@ -18,6 +18,7 @@ from src.environment.rebuild_env import MatchingEnv
 
 MAX_IMPORT_ROWS = 500
 POLICY_VERSION = 'equal-division-canonical/1.0'
+BASELINES = ('hungarian', 'greedy', 'random')
 
 
 def _digest(path):
@@ -50,6 +51,7 @@ class RebuildService:
         self.tag_order = sorted((group, tag) for group, tags in self.taxonomy_groups.items() for tag in tags)
         self.versions = json.loads(json.dumps(versions, allow_nan=False))
         self.models, self.model_contracts = models or {}, model_contracts or {}
+        self.checkpoint_versions = {}
         self.scorable = np.asarray(scorable if scorable is not None else [True]*len(self.advisor_ids), dtype=bool)
         if self.scorable.shape != (len(self.advisor_ids),):
             raise ValueError('invalid_advisor_availability')
@@ -133,9 +135,10 @@ class RebuildService:
                              'warnings': [] if self.scorable[j] else ['Profile has no available frozen score features.']}
                             for j, a in enumerate(self.advisors)],
                 'versions': self.versions, 'template_headers': HEADERS,
-                'algorithms': [{'id': key, 'ready': key == 'hungarian' or key in self.models,
-                                'reason': '' if key == 'hungarian' or key in self.models else 'Native checkpoint unavailable; Hungarian remains available.'}
-                               for key in ('hungarian', 'ppo', 'dqn')],
+                'checkpoint_versions': list(self.checkpoint_versions),
+                'algorithms': [{'id': key, 'ready': key in BASELINES or key in self.models,
+                                'reason': '' if key in BASELINES or key in self.models else 'Native checkpoint unavailable; Hungarian remains available.'}
+                               for key in (*BASELINES, 'ppo', 'dqn')],
                 'limits': {'max_csv_bytes': MAX_CSV_BYTES, 'max_rows': MAX_IMPORT_ROWS},
                 'scope': 'Local inference proposals; uploaded profiles remain outside approved gold.'}
 
@@ -186,7 +189,7 @@ class RebuildService:
             raise ValueError('runtime_artifact_invalid')
         return body['payload']
 
-    def validate_students(self, csv_text, *, scope='local'):
+    def validate_students(self, csv_text, *, scope='local', persist=True, student_workbook=False):
         errors, rows, seen = [], [], set()
         ignored_preferences, ignored_proficiency = False, False
         def error(row, field, code):
@@ -227,7 +230,7 @@ class RebuildService:
                         if not row[field].strip():
                             row[field] = value
                     for item in validate_row(row, 'students', mode='staging', taxonomy_ids=self.taxonomy_ids,
-                                             taxonomy_groups=self.taxonomy_groups,
+                                             taxonomy_groups=self.taxonomy_groups, student_workbook=student_workbook,
                                              allow_unknown_document_confidence=self.versions.get('allow_unknown_document_confidence', False)):
                         error(reader.line_num, item['field'], item['code'])
                     key = row['student_id'].strip()
@@ -252,10 +255,12 @@ class RebuildService:
             return {'valid': False, 'errors': errors, 'row_count': len(rows), 'warnings': warnings}
         payload = {'rows': rows, 'upload_sha256': source_sha, 'captured_at': captured,
                    'versions': self.versions, 'scope': 'user_csv_inference_only', 'warnings': warnings}
-        with self._lock:
-            key = self._persist('cohorts', payload, scope)
-        return {'valid': True, 'cohort_id': key, 'row_count': len(rows), 'errors': [], 'warnings': warnings,
+        result = {'valid': True, 'row_count': len(rows), 'errors': [], 'warnings': warnings,
                 'students': [{field: row[field] for field in ('student_id', 'student_name', 'thesis_title')} for row in rows]}
+        if persist:
+            with self._lock:
+                result['cohort_id'] = self._persist('cohorts', payload, scope)
+        return result
 
     def get_students(self, cohort_id, *, scope='local'):
         payload = self._get('cohorts', cohort_id, scope)
@@ -359,12 +364,12 @@ class RebuildService:
                 'total_capacity': int(capacities.sum()),
                 'warnings': ['Selected profile has no frozen scoring features.'] if any(not self.scorable[self.advisor_ids.index(a)] for a in advisor_ids) else []}
 
-    def _problem(self, cohort_id, advisor_ids, scope):
+    def _problem(self, cohort_id, advisor_ids, scope, *, advisors=None):
         if not isinstance(advisor_ids, list):
             raise ValueError('advisor_ids_list_required')
         students = self.get_students(cohort_id, scope=scope)
         capacities = equal_quotas(len(students), self.advisor_ids, advisor_ids)
-        scored = self.pipeline.transform_score(students, self.advisors)
+        scored = self.pipeline.transform_score(students, advisors if advisors is not None else self.advisors)
         features = np.zeros((len(students), len(self.tag_order)), np.float32)
         known = np.zeros(features.shape, bool)
         for i, student in enumerate(students):
@@ -397,47 +402,63 @@ class RebuildService:
         return {'versions': self.versions, 'rankings': rankings, 'quota_applied': False,
                 'warnings': ['No scorable selected candidate for one or more students.'] if any(not r['recommendations'] for r in rankings) else []}
 
-    def compare(self, cohort_id, advisor_ids, *, coordinator_confirmed=False, scope='local'):
+    def compare(self, cohort_id, advisor_ids, *, coordinator_confirmed=False, scope='local', checkpoint_version=None):
         from src.evaluation.rebuild_benchmark import evaluate_problem
         if coordinator_confirmed is not True:
             raise ValueError('coordinator_confirmation_required')
         policy_version = self.versions.get('quota_policy_version', POLICY_VERSION)
+        models, contracts, advisors = self.models, self.model_contracts, self.advisors
+        if self.checkpoint_versions:
+            checkpoint_version = 'V3' if checkpoint_version is None else checkpoint_version
+            if checkpoint_version not in self.checkpoint_versions:
+                raise ValueError('unknown_checkpoint_version')
+            models, contracts, advisors = self.checkpoint_versions[checkpoint_version]
+        elif checkpoint_version is not None:
+            raise ValueError('unknown_checkpoint_version')
         with self._lock:
-            students, problem = self._problem(cohort_id, advisor_ids, scope)
+            students, problem = self._problem(cohort_id, advisor_ids, scope, advisors=advisors)
             results = {}
             inference_env = MatchingEnv([problem])
             env_contract = inference_env.state_contract
-            for algorithm in ('hungarian', 'ppo', 'dqn'):
-                model = self.models.get(algorithm)
-                if algorithm != 'hungarian' and model is None:
+            quota_only = tuple(s['student_id'] for s in students if not any(
+                s.get(field) for field in ('thesis_title', 'thesis_abstract', 'thesis_keywords', 'skills_tags')))
+            for algorithm in (*BASELINES, 'ppo', 'dqn'):
+                model = models.get(algorithm)
+                if algorithm not in BASELINES and model is None:
                     results[algorithm] = {'status': 'unavailable', 'assignments': [], 'trace': [], 'metrics': {},
                                           'diagnostics': {'reason': 'Native checkpoint not loaded.', 'fallback': 'hungarian'}}
                     continue
-                if model is not None and self.model_contracts.get(algorithm, {}).get('state_contract') != env_contract:
+                if model is not None and contracts.get(algorithm, {}).get('state_contract') != env_contract:
                     raise ValueError('inference_state_contract_mismatch')
-                if model is not None and (self.model_contracts[algorithm].get('reward_weights') != inference_env.reward_weights
-                                         or self.model_contracts[algorithm].get('quota_policy_version') != policy_version):
+                if model is not None and (contracts[algorithm].get('reward_weights') != inference_env.reward_weights
+                                         or contracts[algorithm].get('quota_policy_version') != policy_version):
                     raise ValueError('inference_policy_contract_mismatch')
-                results[algorithm] = evaluate_problem(problem, algorithm, model=model, seed=42)
+                results[algorithm] = evaluate_problem(problem, algorithm, model=model, seed=42, quota_only=quota_only)
                 for assignment in results[algorithm]['assignments']:
                     i, j = problem.student_ids.index(assignment['student_id']), self.advisor_ids.index(assignment['advisor_id'])
                     assignment.update(student_name=students[i].get('student_name', ''), advisor_name=self.advisors[j]['advisor_name'],
-                                      score=float(problem.scores[i, j]), preference=None, preference_known=False)
+                                      score=None if assignment['student_id'] in quota_only else float(problem.scores[i, j]),
+                                      assignment_mode='quota_only' if assignment['student_id'] in quota_only else 'scored',
+                                      preference=None, preference_known=False)
             payload = {'cohort_id': cohort_id, 'versions': self.versions, 'results': results,
+                       'checkpoint_version': checkpoint_version,
                        'policy': {'version': policy_version, 'scope': 'coordinator_confirmed_local_proposal',
                                   'advisor_ids': list(advisor_ids), 'capacities': problem.capacities.tolist(),
                                   'academic_approval': False},
-                       'inference_contract_sha256': record_hash({'input': problem.metadata, 'state': env_contract, 'versions': self.versions}),
+                       'inference_contract_sha256': record_hash({'input': problem.metadata, 'state': env_contract,
+                                                                 'versions': self.versions, 'checkpoint_version': checkpoint_version}),
                        'warnings': list(self._get('cohorts', cohort_id, scope).get('warnings', [])) +
                                    ['Proposals only. No uploaded record was added to approved gold; no model was trained or promoted.']}
             run_id = self._persist('runs', payload, scope)
             return {'run_id': run_id, **payload}
 
     def export(self, run_id, algorithm, *, scope='local'):
-        if algorithm not in ('hungarian', 'ppo', 'dqn'):
+        if algorithm not in (*BASELINES, 'ppo', 'dqn'):
             raise ValueError('unknown_algorithm')
         payload = self._get('runs', run_id, scope)
         result = payload['results'][algorithm]
-        rows = [{**row, 'proposal_scope': payload['policy']['scope'], 'warnings': ' | '.join(payload['warnings'])}
+        rows = [{**row, 'proposal_scope': payload['policy']['scope'], 'checkpoint_version': payload.get('checkpoint_version'),
+                 'warnings': ' | '.join(payload['warnings'])}
                 for row in result['assignments']]
-        return export_rows_csv(rows, ['student_id', 'student_name', 'advisor_id', 'advisor_name', 'score', 'proposal_scope', 'warnings'])
+        return export_rows_csv(rows, ['student_id', 'student_name', 'advisor_id', 'advisor_name', 'score',
+                                     'assignment_mode', 'checkpoint_version', 'proposal_scope', 'warnings'])

@@ -62,6 +62,8 @@ def verify_trace(problem,trace):
     for row in trace:
         _,_,_,_,info=env.step(row['action_index'])
         original={k:v for k,v in row.items() if k!='policy_output'}
+        if row.get('policy_output', {}).get('kind') == 'quota_only_random':
+            original.update(score=0.0, score_known=True)
         if original!=info['decision']:
             raise ValueError('trace_replay_mismatch')
     if len(env.assignments)!=len(problem.student_ids):
@@ -69,23 +71,48 @@ def verify_trace(problem,trace):
     return True
 
 
-def evaluate_problem(problem,algorithm,*,model=None,seed=42):
+def evaluate_problem(problem,algorithm,*,model=None,seed=42,quota_only=()):
     if algorithm not in ALGORITHMS: raise ValueError('unknown_benchmark_algorithm')
     started=time.perf_counter()
+    if quota_only:
+        missing = [i for i, sid in enumerate(problem.student_ids) if sid in quota_only]
+        if len(missing) != len(quota_only):
+            raise ValueError('invalid_quota_only_students')
+        available = problem.available.copy()
+        scores = problem.scores.copy()
+        available[missing] = True
+        scores[missing] = 0
+        problem = replace(problem, available=available, scores=scores,
+                          fixed_assignments=dict(problem.fixed_assignments))
+        order = [i for i in range(len(problem.student_ids)) if i not in missing] + missing
+        random = np.random.default_rng(seed)
+    else:
+        order = None
     if not feasible(problem):
         return {'status':'infeasible','assignments':[],'trace':[],'invalid_action_count':0,
                 'elapsed_seconds':time.perf_counter()-started,'metrics':{'coverage':0.,'constraint_violations':0},
                 'diagnostic':'No complete allocation under exact supplied constraints; no fabricated assignment.'}
-    baseline=solve(problem,algorithm,seed) if algorithm in ('hungarian','greedy','random') else None
+    baseline=solve(problem,algorithm,seed) if algorithm == 'hungarian' or (
+        not quota_only and algorithm in ('greedy', 'random')) else None
     if baseline:
         choices={r['student_id']:r['advisor_id'] for r in baseline['assignments']}
-    elif model is None:
+    elif model is None and algorithm in ('ppo', 'dqn'):
         raise ValueError('trained_model_required')
-    env=MatchingEnv([problem]); obs,_=env.reset(seed=seed); done=False
+    env=MatchingEnv([problem]); obs,_=env.reset(seed=seed,options={'student_order':order}); done=False
     while not done:
         mask=env.action_masks()
-        if baseline:
-            action=problem.advisor_ids.index(choices[problem.student_ids[env.remaining_students[0]]])
+        i = env.remaining_students[0]
+        sid = problem.student_ids[i]
+        if sid in quota_only:
+            action = int(random.choice(np.flatnonzero(mask)))
+            output = {'kind':'quota_only_random', 'seed':seed}
+        elif baseline:
+            action=problem.advisor_ids.index(choices[sid])
+            output={'kind':'solver_decision','algorithm':algorithm}
+        elif algorithm in ('greedy', 'random'):
+            candidates = np.flatnonzero(mask)
+            action = int(random.choice(candidates)) if algorithm == 'random' else min(
+                candidates, key=lambda j: (-problem.utility[i,j], problem.advisor_ids[j]))
             output={'kind':'solver_decision','algorithm':algorithm}
         else:
             action=model.predict(obs,mask,deterministic=True)
@@ -100,6 +127,16 @@ def evaluate_problem(problem,algorithm,*,model=None,seed=42):
         raise RuntimeError('benchmark_final_validation_failed')
     elapsed=time.perf_counter()-started
     verify_trace(problem,env.trace)
+    if quota_only:
+        scored = [row['score'] for row in env.trace if row['student_id'] not in quota_only and row['score_known']]
+        metrics.update(scored_students=len(scored), quota_only_students=len(quota_only),
+                       mean_compatibility=float(np.mean(scored)) if scored else None,
+                       min_compatibility=float(min(scored)) if scored else None,
+                       p10_compatibility=float(np.quantile(scored,.1)) if scored else None)
+        for row in env.trace:
+            if row['student_id'] in quota_only:
+                row['score'] = None
+                row['score_known'] = False
     return {'status':'feasible','assignments':assignments,'trace':env.trace,'metrics':metrics,
             'invalid_action_count':env.invalid_action_count,'trace_replay_verified':True,'elapsed_seconds':elapsed}
 

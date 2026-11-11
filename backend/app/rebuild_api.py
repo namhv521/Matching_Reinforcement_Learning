@@ -86,19 +86,22 @@ def create_app(*, service=None, token=None, output=None, selection_manifest=None
     app.state.rebuild_authorize = authorize
     app.state.rebuild_get_service = get_service
 
-    async def body(request):
+    async def body(request, *, binary=False):
+        limit = MAX_CSV_BYTES if binary else MAX_REQUEST_BYTES
         try:
             declared = int(request.headers.get('content-length', '0'))
         except ValueError:
             raise HTTPException(400, detail='invalid_content_length') from None
-        if declared < 0 or declared > MAX_REQUEST_BYTES:
+        if declared < 0 or declared > limit:
             raise HTTPException(413, detail='request_size_limit')
         chunks, length = [], 0
         async for chunk in request.stream():
             length += len(chunk)
-            if length > MAX_REQUEST_BYTES:
+            if length > limit:
                 raise HTTPException(413, detail='request_size_limit')
             chunks.append(chunk)
+        if binary:
+            return b''.join(chunks)
         try:
             value = json.loads(b''.join(chunks).decode('utf-8'))
         except (ValueError, UnicodeError):
@@ -145,6 +148,24 @@ def create_app(*, service=None, token=None, output=None, selection_manifest=None
         payload = await body(request)
         return await run_in_threadpool(active.validate_students, payload.get('csv_text'), scope=scope)
 
+    @app.post('/api/rebuild/students/workbook')
+    async def workbook(request: Request, confirm: bool = False, scope=Depends(authorize), active=Depends(get_service)):
+        from .rebuild_workbook import normalize_workbook
+        content = await body(request, binary=True)
+        csv_text, errors = await run_in_threadpool(normalize_workbook, content)
+        if errors:
+            return {'valid': False, 'row_count': 0, 'errors': errors, 'warnings': []}
+        return await run_in_threadpool(active.validate_students, csv_text, scope=scope, persist=confirm,
+                                       student_workbook=True)
+
+    @app.get('/api/rebuild/cohorts/{cohort_id}/students.xlsx')
+    def cohort_workbook(cohort_id: str, scope=Depends(authorize), active=Depends(get_service)):
+        from .rebuild_workbook import export_workbook
+        students = active.get_students(cohort_id, scope=scope)
+        return Response(export_workbook(students),
+                        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        headers={'Content-Disposition': 'attachment; filename="unimatch-sinh-vien.xlsx"'})
+
     @app.post('/api/rebuild/quotas')
     async def quotas(request: Request, active=Depends(get_service)):
         payload = await body(request)
@@ -164,8 +185,12 @@ def create_app(*, service=None, token=None, output=None, selection_manifest=None
     @app.post('/api/rebuild/compare')
     async def compare(request: Request, scope=Depends(authorize), active=Depends(get_service)):
         payload = await body(request)
+        version = payload.get('checkpoint_version')
+        if version is not None and not isinstance(version, str):
+            raise HTTPException(400, detail='unknown_checkpoint_version')
+        options = {'checkpoint_version': version} if version is not None else {}
         return await run_in_threadpool(active.compare, payload.get('cohort_id'), payload.get('advisor_ids', []),
-                                       coordinator_confirmed=payload.get('coordinator_confirmed', False), scope=scope)
+                                       coordinator_confirmed=payload.get('coordinator_confirmed', False), scope=scope, **options)
 
     @app.get('/api/rebuild/runs/{run_id}/{algorithm}.csv')
     def export(run_id: str, algorithm: str, scope=Depends(authorize), active=Depends(get_service)):

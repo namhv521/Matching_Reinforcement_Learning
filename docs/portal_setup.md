@@ -8,6 +8,15 @@ CSV giảng viên và các khối checkpoint/phiên bản đã bỏ khỏi UI. C
 
 ## Build và chạy local
 
+Để dùng sáu checkpoint Strict có GitHub và chọn V1–V3 trong màn hình phân công, chạy từ thư mục gốc:
+
+```powershell
+node frontend/build.mjs
+python scripts/serve_unimatch_local.py --checkpoint-catalog
+```
+
+Mở `http://127.0.0.1:8767/landing.html`. Launcher đọc cấu hình OAuth từ `.env` nếu có, nạp các artifact đã kiểm tra trong `outputs/` và lưu dữ liệu thử tại `data_rebuild/runtime/strict_catalog/`. Callback OAuth local phải khớp origin của launcher. Danh mục chạy trên loopback với phạm vi nghiên cứu hồi cứu.
+
 ```powershell
 node frontend/build.mjs
 $env:UNIMATCH_PUBLIC_ORIGIN = 'http://127.0.0.1:8768'

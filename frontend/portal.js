@@ -87,10 +87,33 @@ async function training() {
 
 wireLogout();
 if ($('auth-title')) await login();
-else if (!$('import-form')) { const user=await requireSession(); if(user && $('training-chart')) { await training(); $('refresh-training').addEventListener('click',training); } }
-if ($('campus')) {
-  try {
-    const {createCampus}=await import('./campus-scene.js'); const scene=createCampus($('campus')); const toggle=$('motion-toggle');
-    if(scene){toggle.textContent=scene.paused?'Bật chuyển động':'Tạm dừng chuyển động';toggle.addEventListener('click',()=>{toggle.textContent=scene.toggle()?'Bật chuyển động':'Tạm dừng chuyển động';});addEventListener('pagehide',()=>scene.destroy(),{once:true});} else toggle.hidden=true;
-  } catch { $('motion-toggle').hidden=true; }
+else if (document.body.classList.contains('landing-page')) {
+  const logout = document.querySelector('[data-logout]');
+  if (logout) {
+    logout.hidden = true;
+    fetch('/api/auth/me', {credentials:'same-origin', cache:'no-store'})
+      .then(response => { logout.hidden = !response.ok; }).catch(() => {});
+  }
+} else if (!$('import-form')) { const user=await requireSession(); if(user && $('training-chart')) { await training(); $('refresh-training').addEventListener('click',training); } }
+const canvas = $('campus');
+if (canvas) {
+  const toggle = $('motion-toggle');
+  toggle.hidden = true;
+  let left = false;
+  const observer = new IntersectionObserver(async entries => {
+    if (!entries.some(entry => entry.isIntersecting)) return;
+    observer.disconnect();
+    try {
+      const {createCampus} = await import('./campus-scene.js');
+      if (left) return;
+      const scene = createCampus(canvas);
+      if (!scene) return;
+      toggle.hidden = false;
+      toggle.textContent = scene.paused ? 'Bật chuyển động' : 'Tạm dừng chuyển động';
+      toggle.addEventListener('click', () => { toggle.textContent = scene.toggle() ? 'Bật chuyển động' : 'Tạm dừng chuyển động'; });
+      addEventListener('pagehide', () => scene.destroy(), {once:true});
+    } catch { toggle.hidden = true; }
+  });
+  observer.observe(canvas);
+  addEventListener('pagehide', () => { left = true; observer.disconnect(); }, {once:true});
 }

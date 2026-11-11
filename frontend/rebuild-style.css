@@ -67,6 +67,9 @@
 .quota-list span { font-variant-numeric:tabular-nums; }
 .confirmation { display:flex; gap:10px; align-items:center; font-size:.85rem; }
 .main-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+.advisor-load-list { display:grid; gap:8px; list-style:none; padding:0; }
+.advisor-load-list li { display:flex; align-items:center; gap:8px 14px; flex-wrap:wrap; }
+.advisor-load-list meter, .comparison-model meter { accent-color:#165bb5; }
 .result-section,.rebuild-page>section.work-section { margin-top:24px; }
 .table-scroll { max-width:100%; overflow:auto; }
 .rebuild table { width:100%; border-collapse:collapse; font-size:.85rem; }

@@ -20,10 +20,12 @@
         <section id="import" class="work-section" aria-labelledby="import-title">
           <header class="section-heading"><div><h2 id="import-title">Hồ sơ sinh viên</h2><p>Tải danh sách sinh viên để bắt đầu.</p></div><button id="template" class="secondary" type="button" disabled>Tải CSV mẫu</button></header>
           <form id="import-form">
-            <label class="file-label" for="csv-file">Chọn file CSV sinh viên<input id="csv-file" type="file" accept=".csv,text/csv" disabled required></label>
-            <div class="import-actions"><span id="file-info" class="help">Chưa chọn file.</span><button id="validate" class="primary" type="submit" disabled>Kiểm tra hồ sơ</button></div>
+            <label class="file-label" for="csv-file">Chọn Excel hoặc CSV<input id="csv-file" type="file" accept=".xlsx,.csv,text/csv" aria-describedby="workbook-help" disabled required></label>
+            <p id="workbook-help" class="help">Excel cần cột Họ và tên. Thêm Mã sinh viên, Ý tưởng hoặc Mô tả nếu có. Định dạng ô mã sinh viên là văn bản.</p>
+            <div class="import-actions"><span id="file-info" class="help">Chưa chọn file.</span><button id="validate" class="primary" type="submit" disabled>Kiểm tra hồ sơ</button><button id="confirm-import" class="primary" type="button" hidden disabled>Xác nhận danh sách</button></div>
           </form>
-          <div id="import-result" class="empty-state">Sau khi kiểm tra, lỗi từng dòng và danh sách hồ sơ hợp lệ sẽ xuất hiện ở đây.</div>
+          <div id="import-result" class="empty-state" aria-live="polite">Sau khi kiểm tra, lỗi từng dòng và danh sách hồ sơ hợp lệ sẽ xuất hiện ở đây.</div>
+          <button id="export-workbook" class="secondary" type="button" hidden disabled>Tải Excel chuẩn</button>
         </section>
         <section id="advisors" class="work-section" aria-labelledby="advisors-title">
           <header class="section-heading"><div><h2 id="advisors-title">Giảng viên tham gia</h2><p>Chọn từ danh mục giảng viên của học kỳ.</p></div><span id="selection-count" class="count-label">0 đã chọn</span></header>
@@ -31,7 +33,8 @@
           <fieldset id="advisor-list" disabled><legend class="sr-only">Chọn giảng viên tham gia</legend><p class="empty-state">Kết nối dịch vụ để tải danh mục đã được kiểm chứng.</p></fieldset>
           <div id="quota-preview" class="quota-preview" aria-live="polite">Nhập hồ sơ và chọn giảng viên để xem quota.</div>
           <label class="confirmation"><input id="confirm-policy" type="checkbox" disabled><span>Tôi xác nhận danh sách tham gia và quota chia đều để chạy phân bổ.</span></label>
-          <div class="main-actions"><button id="recommend" class="secondary" type="button" disabled>Xem top-K phù hợp</button><button id="compare" class="primary" type="button" disabled>So sánh PPO · DQN · Hungarian</button></div>
+          <label id="checkpoint-field" class="algorithm-picker" hidden>Checkpoint PPO/DQN<select id="checkpoint-version"></select></label>
+          <div class="main-actions"><button id="recommend" class="secondary" type="button" disabled>Xem top-K phù hợp</button><button id="compare" class="primary" type="button" disabled>Chạy so sánh</button></div>
 
         </section>
       </div>
@@ -43,10 +46,16 @@
       </aside>
     </div>
     <section id="results" class="work-section result-section" aria-labelledby="results-title">
-      <header class="section-heading"><div><h2 id="results-title">Kết quả so sánh</h2><p>Cùng cohort, danh sách giảng viên và quota cho cả ba thuật toán.</p></div><div class="export-actions"><button id="export-json" type="button" class="secondary" disabled>Xuất JSON</button><button id="export-csv" type="button" class="secondary" disabled>Xuất phân bổ CSV</button></div></header>
+      <header class="section-heading"><div><h2 id="results-title">Kết quả so sánh</h2><p>Cùng cohort, danh sách giảng viên và quota cho mọi phương pháp.</p></div><div class="export-actions"><button id="export-json" type="button" class="secondary" disabled>Xuất JSON</button><button id="export-csv" type="button" class="secondary" disabled>Xuất phân bổ CSV</button></div></header>
       <div id="comparison-result" class="empty-state">Chưa có phân bổ. Hoàn tất hồ sơ và danh sách giảng viên ở trên để chạy so sánh.</div>
       <div id="allocation-panel" hidden>
         <label class="algorithm-picker">Xem phân bổ của<select id="result-algorithm"></select></label>
+        <div id="advisor-load-chart"></div>
+        <details id="student-comparison">
+          <summary>So sánh theo sinh viên</summary>
+          <label class="algorithm-picker">Sinh viên<select id="student-comparison-id"></select></label>
+          <div id="student-comparison-chart"></div>
+        </details>
         <div id="assignments-table" class="table-scroll"></div>
 
       </div>
