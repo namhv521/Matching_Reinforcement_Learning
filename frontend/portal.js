@@ -88,12 +88,12 @@ async function training() {
 wireLogout();
 if ($('auth-title')) await login();
 else if (document.body.classList.contains('landing-page')) {
-  const logout = document.querySelector('[data-logout]');
-  if (logout) {
-    logout.hidden = true;
-    fetch('/api/auth/me', {credentials:'same-origin', cache:'no-store'})
-      .then(response => { logout.hidden = !response.ok; }).catch(() => {});
-  }
+  fetch('/api/auth/me', {credentials:'same-origin', cache:'no-store'})
+    .then(response => {
+      if (!response.ok) return;
+      document.querySelectorAll('[data-member]').forEach(element => { element.hidden = false; });
+      document.querySelectorAll('[data-guest]').forEach(element => { element.hidden = true; });
+    }).catch(() => {});
 } else if (!$('import-form')) { const user=await requireSession(); if(user && $('training-chart')) { await training(); $('refresh-training').addEventListener('click',training); } }
 const canvas = $('campus');
 if (canvas) {

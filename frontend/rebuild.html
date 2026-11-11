@@ -13,7 +13,14 @@
   <a class="skip-link" href="#main">Đi tới nội dung chính</a>
   <header class="portal-nav"><a class="brand" href="./landing.html"><span>Uni</span>Match</a><nav aria-label="Điều hướng"><a href="./landing.html">Khám phá</a><a href="./rebuild.html" aria-current="page">Không gian làm việc</a><a href="./dashboard.html">Huấn luyện</a><a href="#assistant">Trợ lý</a></nav><button class="secondary" data-logout>Đăng xuất</button></header>
   <main id="main" class="rebuild-page">
-    <div class="workspace-heading"><div><h1>Cùng tìm một kết nối phù hợp.</h1><p>Chuẩn bị hồ sơ, chọn giảng viên và khám phá từng đề xuất.</p></div><span id="user-greeting"></span></div>
+    <div class="workspace-heading"><div><h1>Phân công giảng viên hướng dẫn</h1><p>Chuẩn bị hồ sơ, chọn giảng viên và khám phá từng đề xuất.</p></div><span id="user-greeting"></span></div>
+    <nav class="workspace-jump" aria-label="Các phần phân công">
+      <a href="#import">Hồ sơ</a>
+      <a href="#advisors">Giảng viên</a>
+      <a href="#results">Kết quả</a>
+      <a href="#simulation">Mô phỏng</a>
+      <a href="#assistant">Trợ lý</a>
+    </nav>
     <div id="message" role="status" aria-live="polite" tabindex="-1" hidden></div>
     <div class="workspace-grid">
       <div class="input-column">
@@ -78,9 +85,9 @@
       <form id="assistant-form"><label for="assistant-question">Câu hỏi hoặc chủ đề nghiên cứu</label><div class="question-row"><input id="assistant-question" maxlength="2000" placeholder="Ví dụ: Chủ đề xử lý ngôn ngữ tự nhiên phù hợp với ai?" disabled required><button id="ask" class="primary" type="submit" disabled>Gửi câu hỏi</button></div></form>
 
     </section>
-    <footer class="workspace-footer">UniMatch · Dữ liệu và mô hình local · Đề xuất cần được người phụ trách xem xét trước khi xác nhận phân công.</footer>
+    <footer class="workspace-footer">UniMatch · Đề xuất cần được người phụ trách xem xét trước khi xác nhận phân công.</footer>
   </main>
-  <noscript>Không gian phân bổ cần JavaScript để kiểm tra CSV và kết nối dịch vụ local.</noscript>
+  <noscript>Không gian phân bổ cần JavaScript để kiểm tra CSV và kết nối dịch vụ.</noscript>
   <script type="module" src="./rebuild-app.js"></script>
 </body>
 </html>
