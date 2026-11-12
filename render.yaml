@@ -6,6 +6,8 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: "off"
     envVars:
+      - key: UNIMATCH_OPENROUTER_API_KEY
+        sync: false
       - key: UNIMATCH_DEPLOYMENT
         value: production
       - key: DATABASE_URL

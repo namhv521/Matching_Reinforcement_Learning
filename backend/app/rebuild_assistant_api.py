@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
+from src.serving.assistant_guardrails import SCOPE, add_public_answer, classify, reply
 from .rebuild_api import create_app as create_matching_app
 
 
@@ -65,23 +66,42 @@ def create_app(*,service=None,assistant=None,token=None,output=None,selection_ma
             payload=json.loads(b''.join(parts).decode('utf-8'))
         except (ValueError,UnicodeError):
             raise HTTPException(400,detail='invalid_json') from None
-        if not isinstance(payload,dict) or set(payload)-{'question','cohort_id','advisor_ids','top_k'}:
+        if not isinstance(payload,dict) or set(payload)-{'question','cohort_id','advisor_ids','top_k','previous_question'}:
             raise HTTPException(400,detail='invalid_assistant_request')
         question=payload.get('question');top_k=payload.get('top_k',5);ids=payload.get('advisor_ids')
         cohort_id=payload.get('cohort_id')
+        previous=payload.get('previous_question')
         if (not isinstance(question,str) or not question.strip() or len(question)>4000
+                or previous is not None and (not isinstance(previous,str) or not previous.strip() or len(previous)>2000)
                 or type(top_k) is not int or not 1<=top_k<=10
                 or ids is not None and (not isinstance(ids,list) or any(not isinstance(x,str) or x not in active.advisor_ids for x in ids))
                 or cohort_id is not None and (not isinstance(cohort_id,str) or re.fullmatch('[0-9a-f]{64}',cohort_id) is None)):
             raise HTTPException(400,detail='invalid_assistant_request')
-        if cohort_id is not None:
-            active.get_students(cohort_id,scope=scope)
-        knowledge=get_assistant(active)
-        result=await run_in_threadpool(knowledge.answer,question,advisor_ids=ids or None,
-                                      top_k=top_k,cohort_id=cohort_id,scope=scope)
+        intent = classify(question)
+        if intent == 'privacy_refusal':
+            result = reply('Mình chỉ tra cứu nguồn được phép và không cung cấp dữ liệu cá nhân hoặc thông tin nội bộ.', intent)
+        elif intent == 'greeting':
+            name = ''
+            if request.cookies.get('unimatch_session'):
+                user = await run_in_threadpool(app.state.portal_authenticated, request)
+                name = ' '.join(str(user.get('name') or '').split())[:100]
+            result = reply(f'Chào {name or "bạn"}! Bạn muốn tìm hiểu đề tài hay giảng viên nào?', intent)
+        elif intent in {'courtesy', 'out_of_scope'}:
+            result = reply(SCOPE, 'out_of_scope')
+        elif intent == 'follow_up' and (not previous or classify(previous) != 'lookup'):
+            result = reply('Bạn đang hỏi tiếp về đề tài hoặc giảng viên nào?', 'clarify')
+        else:
+            if cohort_id is not None:
+                await run_in_threadpool(active.get_students, cohort_id, scope=scope)
+            knowledge=get_assistant(active)
+            query = previous if intent == 'follow_up' else question
+            result=await run_in_threadpool(knowledge.answer,query,advisor_ids=ids or None,
+                                          top_k=top_k,cohort_id=cohort_id,scope=scope)
+            result=await run_in_threadpool(add_public_answer,result)
         profile_scope = ('retrospective_public_sources' if active.versions.get('checkpoint_catalog')
                          else 'all_approved_public_profiles')
-        return {**result,'advisor_selection_scope':('explicit_selected_profiles' if ids else profile_scope)}
+        return {**result,'follow_up':intent == 'follow_up',
+                'advisor_selection_scope':('explicit_selected_profiles' if ids else profile_scope)}
 
     # Exact new routes must precede the existing catch-all StaticFiles mount.
     # Bootstrap adds a capability flag; every other P7 endpoint is retained.

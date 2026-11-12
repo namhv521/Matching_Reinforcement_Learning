@@ -1,5 +1,6 @@
 """Serve the six frozen Strict research checkpoints on one cohort API."""
 
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -9,11 +10,31 @@ from src.data_pipeline.normalization import load_taxonomy
 from src.features.fresh_suite import digest
 from src.features.rebuild_features import preprocess_text
 from src.rl.nested_learning import _load_parent, _parent, verify_round
+from src.serving.assistant_guardrails import SCOPE, reply
+from src.serving.rebuild_assistant import _contains, _norm, _safe_source
 from src.serving.rebuild_service import RebuildService
 from src.serving.semester_service import FrozenSemesterPipeline, read, read_csv
 
 VERSIONS = ('V1', 'V2', 'V3')
 ALGORITHMS = ('ppo', 'dqn')
+QUERY_STOP = set(('ai nao thay co ong ba cho minh ban ve gi voi la cua nhung mot va trong hay '
+                  'giang vien khoa luan de tai nghien cuu chu tim can hop huong dan phu '
+                  'co the nao nguon tai lieu hoc xin chao nhe duoc khong giup the tu van lam muon '
+                  'what which about how who can thesis supervisor research faculty find a the for').split())
+TOPIC_ALIASES = {
+    'natural language processing': r'nlp|xu ly ngon ngu tu nhien|natural language processing',
+    'computer vision': r'cv|thi giac may tinh|computer vision',
+    'machine learning': r'ml|hoc may|machine learning',
+    'deep learning': r'dl|hoc sau|deep learning',
+    'reinforcement learning': r'rl|hoc tang cuong|reinforcement learning',
+}
+
+
+def _search_words(text):
+    text = _norm(text)
+    for canonical, variants in TOPIC_ALIASES.items():
+        text = re.sub(r'\b(?:' + variants + r')\b', canonical, text)
+    return set(text.split()) - QUERY_STOP
 
 
 class CatalogAssistant:
@@ -34,24 +55,65 @@ class CatalogAssistant:
         ])
 
     def answer(self, question, *, advisor_ids=None, top_k=5, **_):
-        query = preprocess_text(question, self.pipeline.identities)[0]
-        scores = (self.pipeline.encoder.transform([query]) @ self.index.T).toarray()[0]
+        normalized = _norm(question)
+        if any(_contains(normalized, phrase) for phrase in ('chi tieu', 'quota', 'con nhan', 'con bao nhieu cho')):
+            return reply('Danh mục nghiên cứu không xác nhận giảng viên còn nhận hướng dẫn. Chỉ tiêu trên UniMatch được tính khi bạn chọn danh sách giảng viên.', 'unknown_operational_facts')
+        if any(_contains(normalized, phrase) for phrase in ('quy trinh khoa luan', 'bat dau khoa luan', 'cach dung unimatch', 'chuan bi ho so')):
+            return reply('Chuẩn bị tên đề tài, mô tả ngắn và từ khóa. Trong UniMatch, bạn có thể nhập hồ sơ, chọn giảng viên rồi xem các đề xuất. Hỏi đơn vị quản lý khóa luận về thời hạn và quy định chính thức.', 'thesis_guidance')
         allowed = set(self.names if advisor_ids is None else advisor_ids)
+        named = {aid for aid in allowed if _contains(normalized, _norm(self.names[aid]))
+                 or _contains(normalized, _norm(self.names[aid]).removeprefix('pgs ').removeprefix('gs ')
+                              .removeprefix('ts ').removeprefix('ths ').removeprefix('th s '))}
+        terms = _search_words(question)
+        if named:
+            allowed = named
+            for aid in named:
+                terms -= _search_words(self.names[aid])
+        if not named and not terms:
+            return reply(SCOPE, 'out_of_scope')
+        topics = [name for name, aliases in TOPIC_ALIASES.items() if re.search(r'\b(?:' + aliases + r')\b', normalized)]
+        expanded = question + ' ' + ' '.join(topics)
+        query = preprocess_text(expanded, self.pipeline.identities)[0]
+        scores = (self.pipeline.encoder.transform([query]) @ self.index.T).toarray()[0]
         citations, rankings, seen = [], [], set()
         for index in np.argsort(-scores, kind='stable'):
-            if scores[index] < .12 or len(rankings) >= top_k:
+            if len(citations) >= top_k:
                 break
             record, snippet = self.documents[index]
             aid = record['advisor_id']
             if aid not in allowed or aid in seen:
                 continue
+            words = snippet.split()
+            windows = [' '.join(words[start:start+28])[:220] for start in range(0, len(words), 18)]
+            windows.append(record['title'][:220])
+            choices = []
+            for excerpt in windows:
+                if not _safe_source(excerpt):
+                    continue
+                normalized_excerpt = _norm(excerpt)
+                overlap = len(terms & _search_words(excerpt))
+                if topics:
+                    if not any(re.search(r'\b(?:' + TOPIC_ALIASES[topic] + r')\b', normalized_excerpt) for topic in topics):
+                        continue
+                elif terms and (overlap < min(4, len(terms)) or overlap * 4 < len(terms) * 3):
+                    continue
+                choices.append((overlap, excerpt))
+            if not choices:
+                continue
+            excerpt = max(choices, key=lambda item: item[0])[1]
             seen.add(aid)
-            rankings.append({'advisor_name':self.names[aid], 'score':float(scores[index])})
+            if not named:
+                rankings.append({'advisor_name': self.names[aid],
+                                 'score': float(scores[index]) if scores[index] >= .12 else None})
             citations.append({'title':record['title'], 'url':record['source_url'],
-                              'snippet':' '.join(snippet.split())[:220]})
-        return {'answer': ('Các hồ sơ dưới đây có nguồn hồi cứu liên quan đến truy vấn.'
-                           if citations else 'Chưa tìm thấy nguồn đủ liên quan trong danh mục hồi cứu.'),
-                'rankings':rankings, 'citations':citations}
+                              'snippet':excerpt})
+        if not citations:
+            return reply('Mình chưa tìm được nguồn phù hợp trong danh mục UniMatch. Nếu đây là đề tài khóa luận, bạn có thể thêm tên kỹ thuật hoặc tên giảng viên.', 'no_evidence')
+        intent = 'advisor_profile' if named else 'topic_match'
+        answer = 'Mình tìm được các nguồn sau trong danh mục UniMatch.'
+        if named:
+            answer = 'Nguồn nghiên cứu về ' + ', '.join(self.names[aid] for aid in sorted(seen)) + '.'
+        return {**reply(answer, intent), 'rankings': rankings, 'citations': citations}
 
 
 def load_catalog(outputs, runtime):

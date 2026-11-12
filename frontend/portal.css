@@ -305,7 +305,7 @@
 .chat-bubble p { margin: 0; color: inherit; white-space: pre-line; }
 .chat-bubble p + p { margin-top: 6px; }
 .chat-bubble details { margin-top: 10px; color: var(--ink); }
-.chat-bubble ul { margin: 6px 0 0; padding-left: 18px; }
+.chat-bubble ol { margin: 6px 0 0; padding-left: 22px; }
 .chat-bubble li + li { margin-top: 8px; }
 .chat-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-suggestions button { min-height: 44px; padding: 6px 10px; font-size: .8rem; }

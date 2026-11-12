@@ -10,6 +10,7 @@ let previewedWorkbook;
 let replayScene, loadingReplay, pageClosed;
 let chatPending = false;
 let chatOpener;
+let previousChatQuestion;
 const chatSuggestions = document.querySelectorAll("#chat-suggestions [data-question]");
 
 function nameStudent(id) { return state.cohort?.students?.find((s) => s.student_id === id)?.student_name || id; }
@@ -334,14 +335,22 @@ async function ask(event) {
   chatPending = true;
   updateChatControls();
   try {
-    const value = await api("/assistant", { question, cohort_id: state.cohort?.cohort_id || null, top_k: 10 });
+    const value = await api("/assistant", {
+      question,
+      cohort_id: state.cohort?.cohort_id || null,
+      top_k: 10,
+      ...(previousChatQuestion ? { previous_question: previousChatQuestion } : {}),
+    });
+    if (value.intent === "topic_match" || value.intent === "advisor_profile") {
+      previousChatQuestion = value.follow_up ? previousChatQuestion : question;
+    }
     pending.querySelector("p").textContent = value.answer || "Chưa có câu trả lời phù hợp.";
     for (const ranking of value.rankings || []) {
       const row = document.createElement("p");
       row.textContent = `${ranking.advisor_name} · ${ranking.score === null ? "Có nguồn khớp chủ đề" : "Điểm liên hệ chủ đề " + score(ranking.score)}`;
       pending.append(row);
     }
-    const sources = document.createElement("ul");
+    const sources = document.createElement("ol");
     for (const citation of value.citations || []) {
       let url;
       try { url = new URL(citation.url || citation.source_url); } catch { continue; }
