@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check nested-research.js && node --check portal.js && node --check campus-scene.js && node --check app.js && node --check rebuild-app.js && node --check visualization.js && node --check student-cohorts.js && node --check home-scene.js && node --check matching-scene.js && node --check scene-engine.js && node --check scene-layout.js && node --check build.mjs",
+    "check": "node --check nested-research.js && node --check portal.js && node --check campus-scene.js && node --check rebuild-app.js && node --check student-cohorts.js && node --check build.mjs",
     "build": "node build.mjs"
   },
   "dependencies": {

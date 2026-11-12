@@ -14,9 +14,13 @@ if (process.env.VERCEL === '1') {
 
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
-await Promise.all(["nested-research.js", "login.html", "landing.html", "dashboard.html", "portal.css", "portal.js", "campus-scene.js", "index.html", "style.css", "app.js", "rebuild.html", "rebuild-app.js", "rebuild-style.css", "visualization.js", "student-cohorts.js", "home-scene.js", "scene-engine.js", "matching-scene.js", "scene-layout.js", "assets"].map((file) => cp(file, `dist/${file}`, { recursive: true })));
+const files = [
+  "index.html", "landing.html", "login.html", "dashboard.html", "rebuild.html",
+  "portal.css", "portal.js", "campus-scene.js", "nested-research.js",
+  "rebuild-app.js", "student-cohorts.js", "assets",
+];
+await Promise.all(files.map((file) => cp(file, `dist/${file}`, { recursive: true })));
 await mkdir("dist/vendor", { recursive: true });
 await cp("node_modules/three/build", "dist/vendor/three", { recursive: true });
 await cp("node_modules/three/LICENSE", "dist/vendor/three/LICENSE.txt");
-await cp("node_modules/three/examples/jsm/controls/OrbitControls.js", "dist/vendor/OrbitControls.js");
-console.log("Built frontend/dist with homepage scene and self-hosted fonts");
+console.log("Built frontend/dist with portal pages, 3D scene and self-hosted fonts");

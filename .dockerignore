@@ -21,9 +21,6 @@
 !frontend/package.json
 !frontend/build.mjs
 !frontend/index.html
-!frontend/style.css
-!frontend/app.js
-!frontend/visualization.js
 !frontend/student-cohorts.js
 !frontend/package-lock.json
 !frontend/*.html
