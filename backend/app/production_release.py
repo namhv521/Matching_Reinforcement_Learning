@@ -46,15 +46,20 @@ def export_release(bundle_path, selection_path, destination):
     for path in sorted(github.rglob('*')):
         if path.is_file():
             files['github/'+path.relative_to(github).as_posix()] = path.read_bytes()
-    manifest = {'schema': 'unimatch-serving/1', 'files': {name: digest(data) for name, data in files.items()},
-                'origin_bundle_sha256': digest(Path(bundle_path).read_bytes()),
+    manifest = {'origin_bundle_sha256': digest(Path(bundle_path).read_bytes()),
                 'origin_selection_sha256': digest(Path(selection_path).read_bytes()),
                 'native_weights_modified': False, 'github_manifest_sha256': source['github_manifest_sha256'],
                 'review_sha256': source['github_quality_review_sha256']}
-    add('release.json', manifest)
+    return write_release(files, manifest, destination)
+
+
+def write_release(files, metadata, destination):
+    manifest = {**metadata, 'schema': 'unimatch-serving/1',
+                'files': {name: digest(data) for name, data in files.items()}}
+    entries = {**files, 'release.json': json.dumps(manifest, allow_nan=False).encode()}
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode='w:gz') as archive:
-        for name, content in sorted(files.items()):
+        for name, content in sorted(entries.items()):
             item = tarfile.TarInfo(name); item.size = len(content); item.mode = 0o600
             archive.addfile(item, io.BytesIO(content))
     payload = output.getvalue()
@@ -65,7 +70,7 @@ def export_release(bundle_path, selection_path, destination):
         raise ValueError('private_release_destination_required')
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(payload)
-    return {'sha256': digest(payload), 'bytes': len(payload), 'files': len(files)}
+    return {'sha256': digest(payload), 'bytes': len(payload), 'files': len(entries)}
 
 
 def unpack_release(payload, expected_sha256, runtime):
@@ -103,6 +108,11 @@ def unpack_release(payload, expected_sha256, runtime):
 
 
 def load_release(folder, runtime_dir):
+    folder = Path(folder)
+    manifest = json.loads((folder/'release.json').read_bytes())
+    if manifest.get('kind') == 'semester-catalog':
+        from .catalog_release import load_catalog_release
+        return load_catalog_release(folder, runtime_dir)
     import numpy as np
     import torch
     from src.domain.rebuild_matching import AllocationProblem
@@ -113,9 +123,8 @@ def load_release(folder, runtime_dir):
     from src.serving.rebuild_service import RebuildService
     from src.serving.github_service import GithubAssistant
     from src.data_pipeline.review_decisions import record_hash
-    folder = Path(folder)
     read = lambda name: json.loads((folder/name).read_bytes())
-    manifest, versions, contract = read('release.json'), read('versions.json'), read('contract.json')
+    versions, contract = read('versions.json'), read('contract.json')
     pipeline = FeaturePipeline.load(folder/'transformer', known_identities=read('identities.json'))
     raw = read('training_problem.json')
     for key in ('scores', 'student_features', 'preferences'):
@@ -148,8 +157,10 @@ def load_release(folder, runtime_dir):
     return service, assistant
 
 
-def publish_release(database, key, path):
+def publish_release(database, key, path, *, expected_sha256=None):
     payload = Path(path).read_bytes(); sha = digest(payload)
+    if expected_sha256 is not None and sha != expected_sha256:
+        raise ValueError('release_hash_mismatch')
     if len(payload) > MAX_ARCHIVE:
         raise ValueError('serving_release_size_limit')
     with database.connect() as db:

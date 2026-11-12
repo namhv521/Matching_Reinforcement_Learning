@@ -24,6 +24,15 @@ Lệnh kiểm tra bundle/checkpoint qua loader cũ, xuất archive tương đố
 
 Gói xuất hiện tại có 370 file, khoảng 6,22 MB nén. Có dữ liệu riêng cho redaction/serving nên không commit archive lên GitHub và không phục vụ archive qua static route. Production tải từ SQL, kiểm tra SHA được pin ở environment, kiểm tra inventory/path/size, rồi nạp weights theo đúng model contract.
 
+Để tạo gói sáu checkpoint PPO/DQN V1–V3 từ các lần chạy Strict GitHub:
+
+```powershell
+python scripts/publish_unimatch_release.py --semester-outputs outputs --release-name strict-github-20261112-v1 --output data_rebuild/deployment/strict-github-20261112-v1.tar.gz
+python scripts/publish_unimatch_release.py --archive data_rebuild/deployment/strict-github-20261112-v1.tar.gz --publish-key strict-github-20261112-v1 --expected-sha256 '<SHA-256 của archive đã kiểm thử>'
+```
+
+Gói Strict chứa trọng số suy luận, bộ mã hóa, hồ sơ giảng viên và số liệu tổng hợp. Sau khi Neon có gói, đặt `UNIMATCH_MODEL_BUNDLE` và `UNIMATCH_MODEL_BUNDLE_SHA256` trên Render, rồi deploy commit hỗ trợ định dạng này. `/health` phải báo `checkpoint_count=6` cùng `checkpoint_versions=["V1","V2","V3"]`. Nếu cần quay lại model trước, khôi phục cặp biến key/SHA của bản cũ và deploy lại.
+
 ## Cấu hình Render
 
 Dùng repo và branch trên, Dockerfile ở root, health `/health`; có thể dùng Blueprint `render.yaml`. Chọn tài nguyên sau khi đo bộ nhớ thực tế; tài liệu này không xác nhận một plan miễn phí đủ RAM cho torch.

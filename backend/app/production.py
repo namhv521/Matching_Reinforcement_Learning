@@ -31,7 +31,7 @@ def create_app():
     folder = unpack_release(bytes(row['payload']), expected, runtime/'releases')
     service, assistant = load_release(folder, runtime/'proposals')
     store = RecordStore(database)
-    store.catalog(service.versions['github_bundle_sha256'], service.advisors, service.versions)
+    store.catalog(service.versions.get('github_bundle_sha256', expected), service.advisors, service.versions)
     service.record_store = store
     from .rebuild_assistant_api import create_app as create_api
     root = Path(__file__).resolve().parents[2]
@@ -56,6 +56,8 @@ def create_app():
         return JSONResponse({'status': 'ready', 'storage': 'postgresql', 'data_loaded': True,
             'advisors': len(service.advisors), 'algorithms': sorted(service.models),
             'training_in_handler': False, 'model_release_sha256': expected,
+            'model_release': key, 'checkpoint_versions': list(service.checkpoint_versions),
+            'checkpoint_count': sum(len(models) for models, _, _ in service.checkpoint_versions.values()) or len(service.models),
             'research_models': True, 'production_promoted': False})
     app.router.routes[:] = [route for route in app.router.routes if getattr(route, 'path', None) != '/health']
     from starlette.routing import Route

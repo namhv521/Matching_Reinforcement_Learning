@@ -5,7 +5,6 @@ from urllib.parse import urlsplit
 
 import numpy as np
 
-from scripts.run_semester_rl import verify_source_audit, verify_suites
 from src.data_pipeline.normalization import load_taxonomy
 from src.features.fresh_suite import digest
 from src.features.rebuild_features import preprocess_text
@@ -56,6 +55,8 @@ class CatalogAssistant:
 
 
 def load_catalog(outputs, runtime):
+    from scripts.run_semester_rl import verify_source_audit, verify_suites
+
     outputs = Path(outputs).resolve()
     bundle = outputs / 'semester_rl_20261111_trusted_year_github'
     strict = bundle / 'strict'
@@ -104,15 +105,21 @@ def load_catalog(outputs, runtime):
             metadata[f'{algorithm}_{version}'] = {'checkpoint_steps': trained['steps_after'],
                                                    'checkpoint_sha256': trained['checkpoint_sha256']}
         catalog[version] = models, contracts, advisors
-    models, contracts, advisors = catalog['V3']
-    known = pipeline.encoder.transform([preprocess_text(a['research_description'], pipeline.identities)[0] for a in advisors])
-    service = RebuildService(pipeline=pipeline, advisors=advisors, taxonomy=load_taxonomy(inputs/'taxonomy_v1.yaml'),
-                             versions={'scope':'retrospective_document_proxy', 'encoder_sha256':digest(suites/'encoder.json'),
-                                       'quota_policy_version':contracts['ppo']['quota_policy_version'],
-                                       'checkpoint_catalog':metadata, 'suite_manifest_sha256':suite_sha},
-                             runtime_dir=runtime, models=models, model_contracts=contracts,
-                             scorable=np.asarray(known.getnnz(axis=1)>0))
+    versions = {'scope': 'retrospective_document_proxy', 'encoder_sha256': digest(suites/'encoder.json'),
+                'quota_policy_version': catalog['V3'][1]['ppo']['quota_policy_version'],
+                'checkpoint_catalog': metadata, 'suite_manifest_sha256': suite_sha}
+    service, assistant = assemble_catalog(pipeline, load_taxonomy(inputs/'taxonomy_v1.yaml'), catalog, versions,
+                                          runtime, read(suites/'V3/faculty_records.json'))
     if service.tag_order != [tuple(item) for item in read(suites/'feature_contract.json')['concept_order']]:
         raise ValueError('catalog_feature_order_mismatch')
+    return service, assistant
+
+
+def assemble_catalog(pipeline, taxonomy, catalog, versions, runtime, faculty_records):
+    models, contracts, advisors = catalog['V3']
+    known = pipeline.encoder.transform([preprocess_text(a['research_description'], pipeline.identities)[0] for a in advisors])
+    service = RebuildService(pipeline=pipeline, advisors=advisors, taxonomy=taxonomy, versions=versions,
+                             runtime_dir=runtime, models=models, model_contracts=contracts,
+                             scorable=known.getnnz(axis=1)>0)
     service.checkpoint_versions = catalog
-    return service, CatalogAssistant(service, read(suites/'V3/faculty_records.json'))
+    return service, CatalogAssistant(service, faculty_records)

@@ -228,6 +228,10 @@ def install_portal(app):
             raise HTTPException(503, 'training_report_unavailable')
         report = json.loads(path.read_bytes())
         service = getattr(app.state, 'rebuild_service', None)
+        if report.get('mode') == 'semester_nested':
+            if not service or service.versions.get('model_release') != report.get('run_id'):
+                raise HTTPException(409, 'training_report_does_not_match_active_models')
+            return report
         if not service or service.versions.get('selection_run_id') != report['experiment']['run_id']:
             raise HTTPException(409, 'training_report_does_not_match_active_models')
         models = {}
