@@ -1,7 +1,7 @@
 name: Ping UniMatch Render
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,23 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Check Render health
         run: |
-          python - <<'PY'
-          import json
-          import time
-          import urllib.request
-          url = "https://unimatch-api-20261016.onrender.com/api/v1/health"
-          for attempt in range(2):
-              try:
-                  with urllib.request.urlopen(url, timeout=90) as response:
-                      health = json.load(response)
-                  if health.get("data_loaded") is not True:
-                      raise RuntimeError("Serving data unavailable")
-                  print("Render health OK; advisors:", health.get("total_advisors"))
-                  break
-              except Exception:
-                  if attempt == 1:
-                      raise
-                  time.sleep(10)
-          PY
+          if ! python3 Run/ping_render.py --once; then
+            sleep 10
+            python3 Run/ping_render.py --once
+          fi
