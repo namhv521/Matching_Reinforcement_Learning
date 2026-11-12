@@ -11,7 +11,7 @@
 </head>
 <body class="rebuild">
   <a class="skip-link" href="#main">Đi tới nội dung chính</a>
-  <header class="portal-nav"><a class="brand" href="./landing.html"><span>Uni</span>Match</a><nav aria-label="Điều hướng"><a href="./landing.html">Khám phá</a><a href="./rebuild.html" aria-current="page">Không gian làm việc</a><a href="./dashboard.html">Huấn luyện</a><a href="#assistant">Trợ lý</a></nav><button class="secondary" data-logout>Đăng xuất</button></header>
+  <header class="portal-nav"><a class="brand" href="./landing.html"><span>Uni</span>Match</a><nav aria-label="Điều hướng"><a href="./landing.html">Khám phá</a><a href="./rebuild.html" aria-current="page">Không gian làm việc</a><a href="./dashboard.html">Huấn luyện</a><a href="#assistant" data-open-chat>Trợ lý</a></nav><button class="secondary" data-logout>Đăng xuất</button></header>
   <main id="main" class="rebuild-page">
     <div class="workspace-heading"><div><h1>Phân công giảng viên hướng dẫn</h1><p>Chuẩn bị hồ sơ, chọn giảng viên và khám phá từng đề xuất.</p></div><span id="user-greeting"></span></div>
     <nav class="workspace-jump" aria-label="Các phần phân công">
@@ -19,7 +19,6 @@
       <a href="#advisors">Giảng viên</a>
       <a href="#results">Kết quả</a>
       <a href="#simulation">Mô phỏng</a>
-      <a href="#assistant">Trợ lý</a>
     </nav>
     <div id="message" role="status" aria-live="polite" tabindex="-1" hidden></div>
     <div class="workspace-grid">
@@ -36,7 +35,7 @@
         </section>
         <section id="advisors" class="work-section" aria-labelledby="advisors-title">
           <header class="section-heading"><div><h2 id="advisors-title">Giảng viên tham gia</h2><p>Chọn từ danh mục giảng viên của học kỳ.</p></div><span id="selection-count" class="count-label">0 đã chọn</span></header>
-          <div class="advisor-tools"><label class="search-label">Tìm giảng viên<input id="advisor-search" type="search" placeholder="Tên hoặc mã giảng viên" disabled></label><button id="select-all" class="secondary" type="button" disabled>Chọn tất cả có tín hiệu</button><button id="clear-selection" class="secondary" type="button" disabled>Bỏ chọn</button></div>
+          <div class="advisor-tools"><label class="search-label">Tìm giảng viên<input id="advisor-search" type="search" placeholder="Nhập tên giảng viên" disabled></label><button id="select-all" class="secondary" type="button" disabled>Chọn tất cả có tín hiệu</button><button id="clear-selection" class="secondary" type="button" disabled>Bỏ chọn</button></div>
           <fieldset id="advisor-list" disabled><legend class="sr-only">Chọn giảng viên tham gia</legend><p class="empty-state">Kết nối dịch vụ để tải danh mục đã được kiểm chứng.</p></fieldset>
           <div id="quota-preview" class="quota-preview" aria-live="polite">Nhập hồ sơ và chọn giảng viên để xem quota.</div>
           <label class="confirmation"><input id="confirm-policy" type="checkbox" disabled><span>Tôi xác nhận danh sách tham gia và quota chia đều để chạy phân bổ.</span></label>
@@ -79,14 +78,35 @@
       <div id="load-chart" class="load-chart"></div>
       <div id="trace-table" class="table-scroll"></div>
     </section>
-    <section id="assistant" class="work-section" aria-labelledby="assistant-title">
-      <header class="section-heading"><div><h2 id="assistant-title">Bạn hỏi, UniMatch tìm nguồn.</h2><p>Trợ lý về đề tài, giảng viên và phân bổ khóa luận tốt nghiệp.</p></div></header>
-      <p id="assistant-status" class="help">Tra cứu toàn bộ danh mục giảng viên đã duyệt.</p><div class="chat-suggestions"><button class="secondary" type="button" data-question="Giảng viên nào có nguồn về NLP?">Tìm giảng viên về NLP</button><button class="secondary" type="button" data-question="Giảng viên nào có nguồn về computer vision?">Tìm giảng viên về CV</button><button class="secondary" type="button" data-question="Nguyễn Hùng Việt nghiên cứu gì?">Hỏi về Nguyễn Hùng Việt</button></div><div id="chat-history" class="chat-history" role="log" aria-label="Hội thoại trợ lý" aria-live="polite"><article class="chat-bubble"><h3>UniMatch</h3><p>Chào bạn! Mình giúp tra cứu giảng viên và chủ đề khóa luận từ nguồn đã duyệt. Bạn đang quan tâm đề tài nào?</p></article></div>
-      <form id="assistant-form"><label for="assistant-question">Câu hỏi hoặc chủ đề nghiên cứu</label><div class="question-row"><input id="assistant-question" maxlength="2000" placeholder="Ví dụ: Chủ đề xử lý ngôn ngữ tự nhiên phù hợp với ai?" disabled required><button id="ask" class="primary" type="submit" disabled>Gửi câu hỏi</button></div></form>
-
-    </section>
     <footer class="workspace-footer">UniMatch · Đề xuất cần được người phụ trách xem xét trước khi xác nhận phân công.</footer>
   </main>
+  <div class="chat-widget">
+    <section id="assistant" class="chat-panel" aria-labelledby="assistant-title" hidden>
+      <header class="chat-header">
+        <div><h2 id="assistant-title">Trợ lý UniMatch</h2><p id="assistant-status" role="status">Đang kết nối trợ lý…</p></div>
+        <button id="chat-close" class="secondary" type="button" aria-label="Đóng trợ lý">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div id="chat-history" class="chat-history" role="log" aria-label="Hội thoại trợ lý" aria-live="polite" aria-relevant="additions text">
+        <article class="chat-bubble"><h3>UniMatch</h3><p>Bạn đang quan tâm đề tài nào? Mình có thể tìm giảng viên, chủ đề nghiên cứu và nguồn tham khảo.</p></article>
+        <div id="chat-suggestions" class="chat-suggestions">
+          <button class="secondary" type="button" data-question="Giảng viên nào có nguồn về NLP?" disabled>Giảng viên về NLP</button>
+          <button class="secondary" type="button" data-question="Giảng viên nào có nguồn về computer vision?" disabled>Giảng viên về CV</button>
+          <button class="secondary" type="button" data-question="Nguyễn Hùng Việt nghiên cứu gì?" disabled>Hỏi về Nguyễn Hùng Việt</button>
+        </div>
+      </div>
+      <form id="assistant-form" class="question-row">
+        <label for="assistant-question" class="sr-only">Câu hỏi hoặc chủ đề nghiên cứu</label>
+        <input id="assistant-question" maxlength="2000" placeholder="Nhập câu hỏi…" disabled required>
+        <button id="ask" class="primary" type="submit" disabled>Gửi</button>
+      </form>
+    </section>
+    <button id="chat-toggle" class="primary" type="button" aria-controls="assistant" aria-expanded="false">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l1.5-3.8A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8 10h8m-8 4h5"/></svg>
+      Trợ lý UniMatch
+    </button>
+  </div>
   <noscript>Không gian phân bổ cần JavaScript để kiểm tra CSV và kết nối dịch vụ.</noscript>
   <script type="module" src="./rebuild-app.js"></script>
 </body>
