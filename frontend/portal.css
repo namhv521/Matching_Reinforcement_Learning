@@ -13,10 +13,11 @@
 
 /* Public portal and sign-in */
 .landing-page { background: var(--white); }
-.landing-mast, .login-story {
+.login-story {
   background: radial-gradient(ellipse at 90% 70%, #174d88 0%, var(--navy) 66%);
   color: var(--white);
 }
+.landing-mast { background: #0f1c38; color: var(--white); }
 .landing-mast .portal-nav { border-bottom: 1px solid #b8dfff38; }
 .landing-mast .brand, .landing-mast .portal-nav nav a { color: var(--white); }
 .landing-mast .brand span, .landing-mast .portal-nav nav a:hover { color: var(--sky); }
@@ -29,67 +30,54 @@
 }
 .nav-sign-in:hover { background: #d5ebff1a; }
 
+/* The full-width campus photo carries the hero. The scrim follows the copy. */
 .landing-hero {
-  max-width: 1440px;
-  margin: auto;
-  padding: clamp(32px, 5.6vw, 78px) 5% clamp(36px, 5vw, 72px);
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(540px, 52vw, 730px);
   display: grid;
-  grid-template-columns: minmax(0, 1.03fr) minmax(0, 1fr);
-  align-items: center;
-  gap: clamp(24px, 4vw, 64px);
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  background: #10213e;
+  color: var(--white);
 }
+.landing-campus-photo, .landing-hero::after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.landing-campus-photo { z-index: -2; object-fit: cover; object-position: 50% 52%; }
+.landing-hero::after {
+  content: "";
+  z-index: -1;
+  background: linear-gradient(90deg, #101b32ed 0%, #101b32b8 45%, #101b3205 82%),
+              linear-gradient(0deg, #101b32cf 0%, transparent 50%);
+}
+.hero-copy, .landing-photo-credit {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding-inline: 5%;
+}
+.hero-copy { padding-block: 90px 48px; }
 .hero-copy h1 {
   margin: 0;
-  max-width: 13ch;
-  font-size: clamp(2.8rem, 5.6vw, 5.35rem);
-  line-height: 1.09;
+  font-size: clamp(3.6rem, 9vw, 6rem);
+  line-height: 1.04;
   letter-spacing: -.035em;
   text-wrap: wrap;
 }
-.hero-copy h1 em, .login-story h1 em { color: var(--sky); font-style: normal; }
-.hero-copy p, .login-story p { color: #d0e4fa; }
-.hero-copy p { max-width: 46ch; margin: 24px 0 30px; font-size: clamp(1rem, 1.5vw, 1.16rem); }
+.login-story h1 em { color: var(--sky); font-style: normal; }
+.login-story p { color: #d0e4fa; }
+.hero-copy p { max-width: 43ch; margin: 20px 0 24px; color: #e6ebf7; font-size: clamp(1rem, 1.5vw, 1.16rem); }
 .hero-actions { display: flex; align-items: center; gap: 12px 22px; flex-wrap: wrap; }
-.landing-hero .button.primary {
-  background: #a5d8ff;
-  color: var(--navy);
-}
-.landing-hero .button.primary:hover { background: #d0ebff; }
-.hero-link { color: #e0efff; font-weight: 700; font-size: .93rem; padding: 10px 0; }
-
-.scene-wrap {
-  margin: 0;
-  border: 1px solid #a9d3fa55;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: #071e4140;
-}
-.campus-frame {
-  position: relative;
-  background: radial-gradient(ellipse at center, #4a9be538, transparent 72%);
-}
-.campus-frame::before, .campus-frame::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-  inset: 10% 16%;
-  border: 1px solid #bde2ff40;
-  border-radius: 50%;
-}
-.campus-frame::after { inset: 18% 22%; }
+.landing-hero .button.primary { background: #f7e8c7; color: #202e48; }
+.landing-hero .button.primary:hover { background: #fff4db; }
+.hero-link { color: #f1f5ff; font-weight: 700; font-size: .93rem; padding: 10px 0; }
+.landing-photo-credit { margin-block: 0; padding-bottom: 18px; text-align: right; color: #f1f5ff; font-size: .82rem; }
+.landing-hero :focus-visible { outline-color: #ffe8ad; }
 .campus-canvas { position: relative; width: 100%; height: clamp(300px, 35vw, 470px); display: block; }
 .scene-caption { font-size: .875rem; color: #c2d9f3; }
-.campus-frame > .scene-caption { padding: 24px; }
-.scene-wrap figcaption {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 16px;
-  border-top: 1px solid #a9d3fa44;
-}
-.scene-caption strong, .scene-caption small { display: block; }
-.scene-caption strong { color: var(--white); }
 .scene-toggle {
   background: transparent;
   border: 1px solid #9dc4ed88;
@@ -229,8 +217,7 @@
 .training-summary { gap: 18px; }
 
 @media (max-width: 800px) {
-  .landing-hero, .landing-flow { grid-template-columns: 1fr; }
-  .hero-copy h1 { max-width: 16ch; }
+  .landing-flow { grid-template-columns: 1fr; }
   .login-shell { gap: 22px; }
 }
 @media (max-width: 600px) {
@@ -238,7 +225,11 @@
   .landing-mast .portal-nav nav { justify-content: flex-start; gap: 18px; }
   .landing-mast .portal-nav nav a { min-height: 44px; display: inline-flex; align-items: center; }
   .nav-sign-in { margin-left: auto; padding-inline: 12px; }
-  .hero-copy h1 { font-size: clamp(2.4rem, 11vw, 3.2rem); }
+  .landing-hero { min-height: 540px; }
+  .landing-hero::after { background: linear-gradient(0deg, #101b32fa 0%, #101b32d9 42%, #101b3233 80%); }
+  .hero-copy { padding-block: 140px 28px; }
+  .hero-copy h1 { font-size: clamp(2.8rem, 12vw, 4rem); }
+  .landing-photo-credit { text-align: left; }
   .campus-canvas { height: 275px; }
   .landing-flow ol { grid-template-columns: 1fr; }
   .landing-flow li { display: grid; grid-template-columns: 2.25rem 1fr; }

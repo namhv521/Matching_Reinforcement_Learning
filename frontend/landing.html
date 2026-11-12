@@ -6,7 +6,6 @@
   <meta name="description" content="Tìm giảng viên hướng dẫn phù hợp và hiểu từng đề xuất phân công khóa luận với UniMatch.">
   <title>UniMatch · Tìm người hướng dẫn khóa luận</title>
   <link rel="stylesheet" href="./portal.css">
-  <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
 </head>
 <body class="landing-page">
   <a class="skip-link" href="#main">Đi tới nội dung chính</a>
@@ -15,43 +14,35 @@
       <a class="brand" href="./landing.html"><span>Uni</span>Match</a>
       <nav aria-label="Điều hướng">
         <a href="#how-it-works">Quy trình</a>
-        <a href="#campus-demo">Mô phỏng 3D</a>
         <a href="./dashboard.html" data-member hidden>Huấn luyện</a>
       </nav>
       <a class="button nav-sign-in" href="./login.html" data-guest>Đăng nhập</a>
       <button class="secondary" data-logout data-member hidden>Đăng xuất</button>
     </header>
-    <main id="main">
-      <section class="landing-hero">
-        <div class="hero-copy">
-          <h1>Từ ý tưởng đến <em>người hướng dẫn phù hợp</em></h1>
-          <p>Khám phá giảng viên theo chủ đề khóa luận, so sánh các phương án phân công và xem từng đề xuất được tạo ra như thế nào.</p>
-          <div class="hero-actions">
-            <a class="button primary" href="./login.html" data-guest>Vào UniMatch</a>
-            <a class="button primary" href="./rebuild.html#import" data-member hidden>Nhập danh sách sinh viên</a>
-            <a class="hero-link" href="#campus-demo">Xem khuôn viên 3D</a>
-          </div>
-        </div>
-        <figure class="scene-wrap" id="campus-demo" aria-labelledby="campus-title">
-          <div class="campus-frame">
-            <canvas id="campus" class="campus-canvas" aria-label="Khuôn viên đại học 3D với các nhân vật sinh viên và giảng viên"></canvas>
-          </div>
-          <figcaption class="scene-caption">
-            <span><strong id="campus-title">Khuôn viên UniMatch</strong><small>Mô hình minh họa 3D</small></span>
-            <button class="scene-toggle" id="motion-toggle" type="button" hidden>Tạm dừng chuyển động</button>
-          </figcaption>
-        </figure>
-      </section>
-    </main>
   </div>
-  <section id="how-it-works" class="landing-flow" aria-labelledby="flow-title">
-    <h2 id="flow-title">Từ hồ sơ đến<br>phương án phân công</h2>
-    <ol>
-      <li><strong>Nhập hồ sơ</strong><p>Tải danh sách Excel, kiểm tra mã sinh viên và ý tưởng đề tài.</p></li>
-      <li><strong>Chọn giảng viên</strong><p>Tra cứu theo chủ đề và kiểm tra chỉ tiêu hướng dẫn.</p></li>
-      <li><strong>So sánh kết quả</strong><p>Đọc bảng, xem biểu đồ và phát lại từng bước phân bổ.</p></li>
-    </ol>
-  </section>
+  <main id="main">
+    <section class="landing-hero">
+      <img class="landing-campus-photo" src="./assets/campus-neu.webp" alt="" width="1920" height="1282" fetchpriority="high">
+      <div class="hero-copy">
+        <h1>Đề tài mới.<br>Hướng đi rõ.</h1>
+        <p>Từ danh sách đề tài đến các phương án hướng dẫn trong một không gian làm việc.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="./login.html" data-guest>Mở UniMatch</a>
+          <a class="button primary" href="./rebuild.html#import" data-member hidden>Nhập danh sách sinh viên</a>
+          <a class="hero-link" href="#how-it-works">Xem các bước</a>
+        </div>
+      </div>
+      <p class="landing-photo-credit">Ảnh khuôn viên · Zing.vn</p>
+    </section>
+    <section id="how-it-works" class="landing-flow" aria-labelledby="flow-title">
+      <h2 id="flow-title">Một quy trình cho cả đợt phân công</h2>
+      <ol>
+        <li><strong>Nhập hồ sơ</strong><p>Đưa danh sách Excel và thông tin đề tài vào hệ thống.</p></li>
+        <li><strong>Xem giảng viên</strong><p>Tra cứu chủ đề và kiểm tra chỉ tiêu hướng dẫn.</p></li>
+        <li><strong>So sánh đề xuất</strong><p>Đọc kết quả, đối chiếu các phương án và phát lại bước phân bổ.</p></li>
+      </ol>
+    </section>
+  </main>
   <footer class="portal-footer">UniMatch · Đề xuất cần người phụ trách xem xét trước khi phân công.</footer>
   <script type="module" src="./portal.js"></script>
 </body>
