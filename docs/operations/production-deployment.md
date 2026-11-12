@@ -13,7 +13,7 @@ Schema additive nằm ở `database/portal.sql`; không thay đổi hoặc xóa 
 
 ## Xuất và đưa gói riêng vào Neon
 
-Trên máy có private artifact đã kiểm chứng:
+Ví dụ xuất bundle GitHub tháng 10 từ máy còn giữ các artifact lịch sử.
 
 ```powershell
 $env:DATABASE_URL = '<Neon PostgreSQL connection string, giữ TLS>'
@@ -22,7 +22,7 @@ python scripts/publish_unimatch_release.py --bundle data_rebuild/github_rebuild/
 
 Lệnh kiểm tra bundle/checkpoint qua loader cũ, xuất archive tương đối dưới `data_rebuild/deployment/`, rồi lưu archive trong PostgreSQL. Ghi lại SHA-256 được in; không in/lưu connection string vào log hoặc Git. Mỗi key là immutable: cùng key mà bytes khác sẽ bị từ chối. Không sửa native checkpoint metadata để di chuyển máy; release riêng chứa các path tương đối và checksum gốc.
 
-Gói xuất hiện tại có 370 file, khoảng 6,22 MB nén. Có dữ liệu riêng cho redaction/serving nên không commit archive lên GitHub và không phục vụ archive qua static route. Production tải từ SQL, kiểm tra SHA được pin ở environment, kiểm tra inventory/path/size, rồi nạp weights theo đúng model contract.
+Gói lịch sử tháng 10 có 370 file, khoảng 6,22 MB nén. Có dữ liệu riêng cho redaction/serving nên không commit archive lên GitHub và không phục vụ archive qua static route. Production tải từ SQL, kiểm tra SHA được pin ở environment, kiểm tra inventory/path/size, rồi nạp weights theo đúng model contract.
 
 Để tạo gói sáu checkpoint PPO/DQN V1–V3 từ các lần chạy Strict GitHub:
 
@@ -43,11 +43,11 @@ Các biến bắt buộc:
 UNIMATCH_DEPLOYMENT=production
 DATABASE_URL=<Neon TLS connection string>
 UNIMATCH_PUBLIC_ORIGIN=<origin HTTPS thực tế>
-UNIMATCH_MODEL_BUNDLE=github-20261023-v1
+UNIMATCH_MODEL_BUNDLE=strict-github-20261112-v1
 UNIMATCH_MODEL_BUNDLE_SHA256=<SHA-256 từ publish>
 ```
 
-Thêm OAuth và giới hạn đăng nhập theo `docs/portal_setup.md`. Khi dùng origin Render trực tiếp, callback là `<render-origin>/api/auth/callback/{google|github|facebook}`. Khi dùng Vercel, callback OAuth chuyển sang origin Vercel. Không dùng tùy ý header proxy để quyết định origin OAuth.
+Thêm OAuth và giới hạn đăng nhập theo [hướng dẫn thiết lập portal](portal-setup.md). Khi dùng origin Render trực tiếp, callback là `<render-origin>/api/auth/callback/{google|github|facebook}`. Khi dùng Vercel, callback OAuth chuyển sang origin Vercel. Không dùng tùy ý header proxy để quyết định origin OAuth.
 
 Start command đã nằm trong Dockerfile: `uvicorn backend.app.production:create_app --factory`, bind `0.0.0.0`, port theo `PORT`, một worker. Production từ chối public bearer token cũ; chỉ chấp nhận cookie phiên, kiểm tra Origin cho POST. SQLite chỉ còn cho local/test.
 

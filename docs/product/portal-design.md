@@ -1,6 +1,6 @@
 # UniMatch · Hướng dẫn triển khai portal khóa luận
 
-Tài liệu này định hướng phiên bản portal tiếp theo. Các yêu cầu và chỉ tiêu dưới đây dùng để triển khai và nghiệm thu. Portal Rebuild hiện có FastAPI, frontend tĩnh, đăng nhập, nhập CSV, so sánh Hungarian/PPO/DQN và phát lại 3D. Backend cũ đã có endpoint Excel ở `/api/v1/student-cohorts/*`. Khi bổ sung Excel cho portal Rebuild, dùng lại phần đọc và kiểm tra workbook phù hợp, rồi chuyển dữ liệu sang contract cohort của Rebuild. So sánh đủ năm thuật toán, chọn checkpoint theo version và RAG là phạm vi triển khai mới.
+Tài liệu này ghi lại định hướng thiết kế và tiêu chí nghiệm thu đề xuất cho portal khóa luận. [README dự án](../../README.md) mô tả phạm vi hệ thống hiện tại.
 
 ## 1. Hành trình chính
 
@@ -94,4 +94,4 @@ Khi thêm model, đăng ký một mục trong catalog và chạy kiểm tra cont
 
 **Nghiệm thu cuối.** Dùng ít nhất một workbook chỉ có tên, một workbook trộn sinh viên có và chưa có ý tưởng, một workbook lỗi, một kỳ thiếu quota và một kỳ dùng đủ 17 giảng viên. Thêm ca nhóm có ý tưởng và nhóm chưa có ý tưởng cạnh tranh cho một suất duy nhất, cùng ca checkpoint sai contract. Kiểm tra truy cập trực tiếp vào run, trace, kết quả chưa công bố và export bằng tài khoản khách, sinh viên khác và điều phối viên khác kỳ. Thử truy vấn RAG chứa mã của sinh viên khác kỳ. Xác nhận export hợp lệ, biểu đồ khớp kết quả backend và trình phát 3D/2D đọc cùng trace. Ghi lại giới hạn, trình duyệt, cấu hình máy và snapshot dùng khi kiểm thử.
 
-Các hướng dẫn đang phục vụ vận hành nằm ở [cài đặt portal](docs/portal_setup.md) và [triển khai production](docs/production_deployment.md).
+Các hướng dẫn đang phục vụ vận hành nằm ở [cài đặt portal](../operations/portal-setup.md) và [triển khai production](../operations/production-deployment.md).

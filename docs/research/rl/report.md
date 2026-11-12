@@ -133,9 +133,9 @@ Cách đọc: lấy một panel, so đường learner với parent và các base
 
 Ở V1, DQN kết thúc khoảng 0,118531, PPO khoảng 0,108544, còn Hungarian khoảng 0,119531. DQN gần nghiệm tối ưu hơn PPO trên validation V1. Các đường đổi lên/xuống cho thấy train thêm không bảo đảm tăng đều. Validation chỉ 4/9/7 sinh viên nên thay đổi vài lựa chọn có thể tạo bước nhảy lớn; đường phẳng cũng chưa chứng minh hội tụ.
 
-![Điểm validation theo bước thêm](assets/rl_2_cap/validation_steps.png)
+![Điểm validation theo bước thêm](../../assets/rl_2_cap/validation_steps.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/validation_steps.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/validation_steps.svg)
 
 ### Bộ đếm bước của lineage
 
@@ -145,9 +145,9 @@ V1 chạy từ 0 đến 131.072. Candidate V2 chạy từ 131.072 đến 262.144
 
 Các đối chứng từ đầu bắt đầu ở 0. Tổng 1.310.720 bước của cả thí nghiệm không có nghĩa một model đã học liên tục 1.310.720 bước.
 
-![Bộ đếm bước của lineage](assets/rl_2_cap/validation_cumulative_steps.png)
+![Bộ đếm bước của lineage](../../assets/rl_2_cap/validation_cumulative_steps.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/validation_cumulative_steps.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/validation_cumulative_steps.svg)
 
 ### Khoảng cách tới Hungarian
 
@@ -157,9 +157,9 @@ Ví dụ cuối V1: regret DQN xấp xỉ 0,001000; regret PPO xấp xỉ 0,0109
 
 Hungarian giải tối ưu objective tuyến tính hiện dùng với toàn bộ ma trận điểm; policy RL không thấy đầy đủ điểm tương lai. Vì vậy đường này đo khoảng cách đến oracle của bài toán mô phỏng, không đo sai số điểm khóa luận hoặc độ hài lòng. Với đúng cùng objective/ràng buộc, không kỳ vọng RL vượt nghiệm tối ưu này.
 
-![Khoảng cách tới Hungarian](assets/rl_2_cap/hungarian_regret.png)
+![Khoảng cách tới Hungarian](../../assets/rl_2_cap/hungarian_regret.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/hungarian_regret.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/hungarian_regret.svg)
 
 ### Return trên train
 
@@ -169,9 +169,9 @@ Các đường tăng khá rõ cho thấy policy đang nhận nhiều reward hơn
 
 Reward có completion bonus và shaping, còn objective validation là utility không chiết khấu. Train cũng có exploration và thứ tự sinh viên được xáo trộn. Bởi vậy return tăng trong khi validation dao động không mâu thuẫn. Không so raw return giữa hai panel khác cohort để kết luận model năm sau tốt hơn.
 
-![Return trên train](assets/rl_2_cap/training_return.png)
+![Return trên train](../../assets/rl_2_cap/training_return.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/training_return.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/training_return.svg)
 
 ### Loss của PPO và DQN
 
@@ -181,9 +181,9 @@ Loss PPO là tổng các thành phần policy/value của thuật toán; có th�
 
 Không so 0,01 của DQN với −0,02 của PPO để chọn learner tốt hơn. Cũng không dùng loss thấp để kết luận phân công tốt: cần đối chiếu validation, holdout cũ và test. Ví dụ DQN có loss nhỏ về cuối nhưng candidate V3 vẫn làm giảm điểm V1 cũ.
 
-![Loss của PPO và DQN](assets/rl_2_cap/training_loss.png)
+![Loss của PPO và DQN](../../assets/rl_2_cap/training_loss.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/training_loss.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/training_loss.svg)
 
 ### So sánh cuối 131.072 bước trên validation
 
@@ -193,9 +193,9 @@ Không so 0,01 của DQN với −0,02 của PPO để chọn learner tốt hơn
 
 Accepted của đối chứng từ đầu chỉ là qua kiểm tra bootstrap/an toàn, không có phép so parent hoặc holdout lịch sử như nhánh kế thừa. Một candidate có điểm mới tăng vẫn có thể rejected: PPO V3 tăng 0,004145 so với parent trên V3 nhưng làm giảm V2 cũ 0,008966.
 
-![So sánh cuối 131.072 bước trên validation](assets/rl_2_cap/final_comparison.png)
+![So sánh cuối 131.072 bước trên validation](../../assets/rl_2_cap/final_comparison.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/final_comparison.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/final_comparison.svg)
 
 ### Giữ chất lượng trên bối cảnh cũ
 
@@ -205,9 +205,9 @@ Ví dụ ô PPO, cột V3/hàng V2 là +0,0090: cập nhật V3 làm mất kho�
 
 Các ô trong V3 đều so với policy thực sự được giữ là V1, không so với trọng số V2 đã bị loại. V2 là bối cảnh lịch sử cần bảo toàn hiệu năng, không phải một bản học V2 đã được chấp nhận thành công. Hình này cho biết trade-off của cập nhật, chưa xác định riêng nguyên nhân gây quên.
 
-![Giữ chất lượng trên bối cảnh cũ](assets/rl_2_cap/forgetting_heatmap.png)
+![Giữ chất lượng trên bối cảnh cũ](../../assets/rl_2_cap/forgetting_heatmap.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/forgetting_heatmap.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/forgetting_heatmap.svg)
 
 ### Thời gian và tính khả thi
 
@@ -217,9 +217,9 @@ Các fit ở khoảng 500–700 giây. Vì chạy hai process trên máy đang d
 
 Coverage 100% nghĩa là tất cả sinh viên trong case đánh giá có một phân công hợp lệ; không có nghĩa phù hợp học thuật 100%. Panel vi phạm nhìn trống vì tất cả giá trị bằng 0, không phải mất dữ liệu. Hard mask/quota đóng vai trò lớn trong hai kết quả khả thi này.
 
-![Thời gian và tính khả thi](assets/rl_2_cap/runtime_constraints.png)
+![Thời gian và tính khả thi](../../assets/rl_2_cap/runtime_constraints.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/runtime_constraints.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/runtime_constraints.svg)
 
 ### Lượt smoke 1.024 bước và lượt 131.072 bước
 
@@ -229,9 +229,9 @@ PPO V1 tăng từ khoảng 0,071804 lên 0,108544; DQN V1 gần như giữ nguy�
 
 V2/V3 ở hai thí nghiệm có thể kế thừa các parent khác nhau. Do đó đây là so sánh hai ngân sách/quỹ đạo, không cô lập tác động nhân quả của chỉ số step. Không có cặp DQN V3 vì lần smoke trước không hoàn tất case đó; không đọc phần thiếu thành điểm 0.
 
-![Lượt smoke 1.024 bước và lượt 131.072 bước](assets/rl_2_cap/smoke_vs_long.png)
+![Lượt smoke 1.024 bước và lượt 131.072 bước](../../assets/rl_2_cap/smoke_vs_long.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/smoke_vs_long.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/smoke_vs_long.svg)
 
 ### Kết quả final test sau lựa chọn đóng băng
 
@@ -243,9 +243,9 @@ Ví dụ test V2: DQN được giữ đạt 0,148416; PPO được giữ đạt 
 
 Một số candidate PPO bị từ chối lại có test cao hơn model được giữ. Không chọn lại theo các cột test: lựa chọn đã đóng băng trước khi mở test; đổi lựa chọn lúc này sẽ làm test trở thành dữ liệu chọn model. Không có confidence interval nhiều seed, nên chưa kết luận ưu thế thống kê hoặc hiệu quả học vụ.
 
-![Kết quả final test sau lựa chọn đóng băng](assets/rl_2_cap/final_test_comparison.png)
+![Kết quả final test sau lựa chọn đóng băng](../../assets/rl_2_cap/final_test_comparison.png)
 
-[Bản SVG để phóng lớn](assets/rl_2_cap/final_test_comparison.svg)
+[Bản SVG để phóng lớn](../../assets/rl_2_cap/final_test_comparison.svg)
 
 ## Kết luận thực nghiệm và phần còn thiếu
 
@@ -362,9 +362,9 @@ Trạng thái: **completed**. Điểm là objective/student trên validation, kh
 
 ### Đọc các biểu đồ mới
 
-![So sánh điểm cuối từng round](../frontend/assets/nested-rl/round-comparison.png)
+![So sánh điểm cuối từng round](../../../frontend/assets/nested-rl/round-comparison.png)
 
-![So sánh các mốc step từng round](../frontend/assets/nested-rl/step-curves.png)
+![So sánh các mốc step từng round](../../../frontend/assets/nested-rl/step-curves.png)
 
 - Biểu đồ điểm cuối theo round đặt các candidate cạnh nhau. Nhìn riêng từng version; giá trị cuối không đồng nghĩa model đã được gate chấp nhận.
 - Biểu đồ step gồm 12 panel V1–V3 × R1–R4. Đường chấm là parent cố định trên cùng validation; đường liền là candidate tại các mốc đo thật. Không có dải tin cậy vì chỉ một seed.

@@ -15,8 +15,8 @@ Ngày: 05/11/2026
 
 ### Tài liệu
 
-- `docs/advisor_skill_prd_spec_current.md`: PRD/SPEC hợp nhất, đối chiếu với spec cũ v1.3. Ghi rõ phần đã làm, phần còn thiếu và các gate trước khi train.
-- `docs/advisor_skill_implementation_guide.md`, mục 5.1: lệnh crawl 2025, partition, review-pack, close.
+- `docs/research/advisors/consolidated-spec.md`: PRD/SPEC hợp nhất, đối chiếu với spec cũ v1.3. Ghi rõ phần đã làm, phần còn thiếu và các gate trước khi train.
+- `docs/research/advisors/implementation-guide.md`, mục 5.1: lệnh crawl 2025, partition, review-pack, close.
 
 ### Kiểm thử
 

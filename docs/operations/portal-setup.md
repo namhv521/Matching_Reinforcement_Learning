@@ -1,24 +1,30 @@
-# Chạy giao diện UniMatch mới
+# Thiết lập portal UniMatch
 
 ## Giao diện
 
-`login.html` là cửa vào; đăng nhập thành công chuyển tới `landing.html`. `rebuild.html` chứa hồ sơ, lựa chọn giảng viên, so sánh, phát lại 3D và chatbot. `dashboard.html` đọc báo cáo huấn luyện đã lưu, chỉ hiện khi mã lần chạy khớp mô hình đang phục vụ.
+`landing.html` là trang giới thiệu. Nút đăng nhập mở `login.html` và đưa người dùng trở về portal sau khi xác thực. `rebuild.html` chứa hồ sơ, lựa chọn giảng viên, so sánh, phát lại 3D và chatbot. `dashboard.html` đọc báo cáo huấn luyện đã lưu, chỉ hiện khi mã lần chạy khớp mô hình đang phục vụ.
 
-CSV giảng viên và các khối checkpoint/phiên bản đã bỏ khỏi UI. Catalog hiện vẫn đọc từ bộ dữ liệu đã duyệt của backend; thay đổi database/catalog cần quy trình cập nhật dữ liệu và kiểm chứng mô hình hiện có. API intake giảng viên cũ được giữ cho công cụ vận hành, không xuất hiện trong luồng người dùng.
+Portal hỗ trợ nhập hồ sơ sinh viên bằng CSV hoặc Excel. Khi nạp danh mục Strict GitHub, màn hình phân công cho phép chọn V1–V3. Catalog hiện vẫn đọc từ bộ dữ liệu đã duyệt của backend; thay đổi database/catalog cần quy trình cập nhật dữ liệu và kiểm chứng mô hình hiện có. API intake giảng viên cũ được giữ cho công cụ vận hành, không xuất hiện trong luồng người dùng.
 
 ## Build và chạy local
 
-Để dùng sáu checkpoint Strict có GitHub và chọn V1–V3 trong màn hình phân công, chạy từ thư mục gốc:
+Cần Python 3.12, Node.js 22 và bộ artifact Strict GitHub riêng. Từ thư mục gốc, cài phụ thuộc, build frontend và mở portal:
 
 ```powershell
-node frontend/build.mjs
+python -m pip install -r requirements-rebuild-web.txt
+npm --prefix frontend ci
+npm --prefix frontend run build
 python scripts/serve_unimatch_local.py --checkpoint-catalog
 ```
 
 Mở `http://127.0.0.1:8767/landing.html`. Launcher đọc cấu hình OAuth từ `.env` nếu có, nạp các artifact đã kiểm tra trong `outputs/` và lưu dữ liệu thử tại `data_rebuild/runtime/strict_catalog/`. Callback OAuth local phải khớp origin của launcher. Danh mục chạy trên loopback với phạm vi nghiên cứu hồi cứu.
 
+### Chạy bundle GitHub tháng 10
+
+Lệnh sau dành cho trường hợp còn giữ đúng bundle và manifest lịch sử.
+
 ```powershell
-node frontend/build.mjs
+npm --prefix frontend run build
 $env:UNIMATCH_PUBLIC_ORIGIN = 'http://127.0.0.1:8768'
 python scripts/serve_github_unimatch_local.py --bundle data_rebuild/github_rebuild/20261022T205450Z-5ddcb75a/training_bundle.json --selection data_rebuild/github_training/github_retraining_runs/20261022T205827Z-16010d68/selection_manifest.json --runtime data_rebuild/runtime/portal --port 8768
 ```
@@ -27,7 +33,7 @@ Mở `http://127.0.0.1:8768/login.html`. Entrypoint này vẫn chỉ bind loopba
 
 ## OAuth và giới hạn đăng nhập
 
-Khai báo environment variables trước khi chạy Python; launcher không tự đọc `.env`. Tên biến có trong `.env.example`:
+Khai báo biến môi trường trước khi chạy Python hoặc dùng `.env` với launcher `--checkpoint-catalog`. Tên biến có trong `.env.example`.
 
 - `UNIMATCH_PUBLIC_ORIGIN`: origin chính xác, gồm scheme và port nếu có.
 - `UNIMATCH_GOOGLE_CLIENT_ID`, `UNIMATCH_GOOGLE_CLIENT_SECRET`.
@@ -43,16 +49,27 @@ Phiên UniMatch dùng cookie HttpOnly, SameSite=Lax, thời hạn tám giờ; Se
 
 Tham khảo: [Google server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [GitHub OAuth](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps), [Facebook manual login](https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow/).
 
-## Dữ liệu huấn luyện và chatbot
+## Báo cáo và trợ lý
+
+Production đọc báo cáo đã lưu từ gói mô hình đang phục vụ. Trợ lý tra cứu hồ sơ giảng viên và các đoạn tài liệu có nguồn.
+
+### Ghi chú về bundle tháng 10
 
 Dashboard đọc `docs/validation/github_retraining_numeric_20261023.json`. Đây là snapshot của experiment, không phải live worker; nút cập nhật đọc lại snapshot. Báo cáo hiện có năm seed, 131.072 bước mỗi thuật toán/seed; mốc chọn PPO 131.072 và DQN 98.304. Cả hai chưa đạt tiêu chí plateau trong ba lần đánh giá cuối. Chưa đánh giá test hoặc promote production. Không hiển thị phần trăm “độ hoàn thiện”.
 
 Chatbot là hội thoại tra cứu theo quy tắc và nguồn đã duyệt, không gọi LLM. Tra cứu toàn danh mục độc lập với roster phân bổ. `CV` được mở rộng thành `computer vision` chỉ ở truy vấn, không đổi taxonomy/encoder đã train. Nguồn GitHub khớp concept nhưng chưa có điểm encoder vẫn xuất hiện, với điểm chưa biết thay vì điểm giả. Truy vấn CV hiện tìm được cả Nguyễn Hùng Việt và Nguyễn Hùng Thắng; NLP tìm được Nguyễn Hùng Thắng theo nguồn đã duyệt. Không gán NLP cho Nguyễn Hùng Việt khi nguồn đã duyệt chưa chứng minh concept đó. Chủ đề ngoài phạm vi bị từ chối.
 
-## Kiểm chứng và giới hạn
+### Kiểm chứng của bundle tháng 10
 
 Kiểm tra API, security, assistant, OAuth giả lập và launcher: 65 passed, 1 skipped ở lượt kiểm tra cuối. Browser dùng danh tính QA tổng hợp tạo trực tiếp trong kho phiên để kiểm tra UI; không phải bằng chứng đăng nhập Google/GitHub/Facebook thật. OAuth cần client ID/secret thực và kiểm chứng nhà cung cấp trước khi sử dụng.
 
 Smoke browser: nhập ba hồ sơ kiểm thử có đề tài tiếng Việt, chọn một giảng viên có dữ liệu phù hợp, chạy đủ ba thuật toán, xem trace ba bước, hỏi CV/NLP/câu ngoài phạm vi và xuất CSV. Kết quả trên ba hồ sơ này không phải benchmark chất lượng mô hình. Mẫu hoàn toàn ngoài vocabulary có thể không phân bổ được; UI giữ kết quả không khả thi.
 
-Ảnh QA ở `frontend/qa-artifacts/portal/` (Git-ignored). Các asset 3D là hình học native được viết trong code, không cần tài khoản asset ngoài.
+Các asset 3D là hình học native được viết trong code, không cần tài khoản asset ngoài.
+
+## Kiểm tra mã
+
+```powershell
+npm --prefix frontend run check
+python -m pytest tests/rebuild -q
+```

@@ -1,6 +1,6 @@
 # Bàn giao triển khai advisor skill
 
-Cập nhật: 02/11/2026, Asia/Saigon. Spec sở hữu: `docs/advisor_skill_semester_prd_spec.md` v1.3. Runbook: `docs/advisor_skill_implementation_guide.md`.
+Cập nhật: 02/11/2026, Asia/Saigon. Spec sở hữu: `docs/advisor_skill_semester_prd_spec.md` v1.3. Runbook: `docs/research/advisors/implementation-guide.md`.
 
 ## Yêu cầu đã chốt
 
@@ -22,7 +22,7 @@ File mới:
 - `src/data_pipeline/advisor_skill_collection.py`: exact seed collector có ngân sách, raw/status, Chrome queue và API nhập capture UI thật.
 - `scripts/advisor_skill_pipeline.py`: collect/extract/score, immutable output, registry/taxonomy validation, semester cutoff guard, external-source guard, code/data/spec/taxonomy hash manifests.
 - Bốn test mới `tests/test_advisor_skill_{scores,extraction,collection,pipeline}.py`.
-- `docs/advisor_skill_implementation_guide.md`.
+- `docs/research/advisors/implementation-guide.md`.
 
 Không sửa source frontend/backend/RL cũ hoặc checkpoint. Repo đã có nhiều thay đổi/xóa trước phiên này; không restore/clean chúng. Không thêm dependency. `docs/`, `tests/`, `outputs/`, `data/` hiện bị Git ignore; file mới vẫn local. Chưa stage/commit/push.
 
@@ -85,7 +85,7 @@ Kết quả mới: `outputs/advisor_skill_20261103/`. `github_collection`+`git_r
 
 `paper_document_jobs_v2` giữ16document identity SHA riêng title candidate; `paper_skill_extraction` đã xử lý207trang/628855text chars,53claim từ14/16document:6usage candidates47unknown. Tất cả claim/identity pending; available_at/split null; không có điểm final hoặc training approval. CLI đã giữ provenance identity và scorer chặn pending article-person/document-match.
 
-Chrome phân trang đã lưu mới `chrome_profiles`:Phạm Xuân Lâm20→39,Nguyễn Trung Tuấn20→100→117,Phạm Minh Hoàn20→26. Các snapshot khác vẫn pending pagination, không gán hết thư viện. `paper_chrome_truth_v2` phân biệt39status files nhưng chỉ21navigation có bằng chứng;10ReferenceError+8debugger transport không coi là site blocked. Chi tiết trong `docs/advisor_skill_progress_20261103.md`.
+Chrome phân trang đã lưu mới `chrome_profiles`:Phạm Xuân Lâm20→39,Nguyễn Trung Tuấn20→100→117,Phạm Minh Hoàn20→26. Các snapshot khác vẫn pending pagination, không gán hết thư viện. `paper_chrome_truth_v2` phân biệt39status files nhưng chỉ21navigation có bằng chứng;10ReferenceError+8debugger transport không coi là site blocked. Chi tiết trong `docs/archive/advisors/advisor_skill_progress_20261103.md`.
 
 Batch source đầu `source_reading_batch/manifest.json` interrupted_source_reading AI-Portal,83units đã lưu; không dùng làm dữ liệu đầy đủ. Agent đang sửa hiệu năng lazy Git blob và các review issues:đúng identity_review_status,merge duplicate text/AST claims,preserve partial completeness,alias shadowing. Cần đọc progress/manifest lượt v2 và test cuối phiên trước tiếp tục, không chạy lại output cũ.
 
@@ -111,8 +111,8 @@ Lượt v1 interrupted giữ83unit. V2 sourceAI-Portal494unit/4544859bytes đã 
 
 Chưa training/promotion. Chưa tựduyệt identity,articlematch,GVHD,available_at. Tiếp theo hoàn tất source; ChromePDF18nguồn lỗi điều phối cần sửa,21navigation có bằng chứng; xác minh phầnarticlePDF/tác giả thực trướcchấmđiểm. Công thứcP/E40/60 vàprofile/GVHD50/50, chỉ tính bài dùngskill giữ nguyên.
 
-Quota cuối đã kiểm tra99%used, còn1% (<3%): đã kích hoạt bàn giao. V3Handio đang dở, yêu cầu agent dừng tiến trình và chốt manifest; nếu chưa có manifest phải đọc progress4repo49claims, không chạy lại nguồn494unit. Session73577/PID9684 là tiến trình cần xác minh đãdừng trướcresume. Backupđồngbộ tại docs/handoffs/advisor_skill_handoff_20261103_115400.md.
+Quota cuối đã kiểm tra99%used, còn1% (<3%): đã kích hoạt bàn giao. V3Handio đang dở, yêu cầu agent dừng tiến trình và chốt manifest; nếu chưa có manifest phải đọc progress4repo49claims, không chạy lại nguồn494unit. Session73577/PID9684 là tiến trình cần xác minh đãdừng trướcresume. Backupđồngbộ tại docs/archive/advisors/handoffs/advisor_skill_handoff_20261103_115400.md.
 
 
 ## Tiếp tục05/11/2026
-Bàn giao mới nhất tại docs/advisor_skill_progress_20261105.md. Đọc file mới vàmanifest authoritative thay vì chỉ dùng snapshot03/11. Ngưỡngquota còn dưới3% giữ nguyên.
+Bàn giao mới nhất tại docs/archive/advisors/advisor_skill_progress_20261105.md. Đọc file mới vàmanifest authoritative thay vì chỉ dùng snapshot03/11. Ngưỡngquota còn dưới3% giữ nguyên.
